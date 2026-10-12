@@ -106,11 +106,25 @@ export function useFollow(steps: FollowStep[], bpm: number, octaveFree: boolean)
 
   useEffect(() => onMidiNote((e) => e.type === 'on' && press(e.note)), [press]);
 
+  /**
+   * Where the beat is now, in 16ths: it runs at tempo from the last correct
+   * press and stops at the notes being waited for. Drives the timing guide
+   * for the hand that is not being practised.
+   */
+  const beatPosition = useCallback((): number | null => {
+    const st = s.current;
+    const cur = stepsRef.current[st.idx];
+    if (!st.active || !cur) return null;
+    const now = performance.now();
+    if (now >= st.due) return cur.t16;
+    return cur.t16 - ((st.due - now) / (60000 / bpmRef.current)) * 4;
+  }, []);
+
   // a new arrangement (hand, rhythm, key…) restarts nothing silently: stop instead
   useEffect(() => stop(), [steps, stop]);
 
   const current = active ? steps[idx] : undefined;
-  return { active, start, stop, press, idx, isDue, done, errors, wrongNote, lastTiming, result, current, total: steps.length };
+  return { active, start, stop, press, beatPosition, idx, isDue, done, errors, wrongNote, lastTiming, result, current, total: steps.length };
 }
 
 export function timingLabel(ms: number | null): string {

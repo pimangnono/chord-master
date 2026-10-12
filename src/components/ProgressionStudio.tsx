@@ -107,6 +107,27 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
   const followSteps = useMemo(() => buildFollowSteps(buildArrangement(keyed, sheetRhythm, voicingMode), hands), [keyed, sheetRhythm, voicingMode, hands]);
   const follow = useFollow(followSteps, bpm, octaveFree);
   const midiStatus = useMidi((s) => s.status);
+  // timing guide for the hand not being practised: redraw once per 16th
+  const [guide, setGuide] = useState<number | null>(null);
+  useEffect(() => {
+    if (!follow.active || hands === 'both') {
+      setGuide(null);
+      return;
+    }
+    let raf = 0;
+    let last = NaN;
+    const tick = () => {
+      const pos = follow.beatPosition();
+      const step = pos === null ? NaN : Math.floor(pos);
+      if (step !== last) {
+        last = step;
+        setGuide(pos === null ? null : step);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [follow.active, follow.beatPosition, hands]);
 
   type Settings = { key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean; voicing: VoicingMode; slashes: Record<number, string>; flip: boolean };
   const restart = (patch: Partial<Settings>) => {
@@ -388,7 +409,7 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
           )}
           {!follow.active && !follow.result && (
             <p className="muted small">
-              박자에 맞춰 음표가 빨간색으로 바뀌면 그 음을 정확히 누르세요. 맞게 누를 때까지 기다려줘요. MIDI 피아노가 가장 정확하고, 화면 건반을 눌러도 돼요. 템포는 위 템포 슬라이더를 따라요.
+              박자에 맞춰 음표가 빨간색으로 바뀌면 그 음을 정확히 누르세요. 맞게 누를 때까지 기다려줘요. 한 손만 연습할 때는 다른 손 음표도 박자에 맞춰 빨갛게 표시돼요(누르지 않아도 돼요). MIDI 피아노가 가장 정확하고, 화면 건반을 눌러도 돼요. 템포는 위 템포 슬라이더를 따라요.
             </p>
           )}
         </div>
@@ -398,7 +419,7 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
           keySig={key}
           voicing={voicingMode}
           activeBeat={follow.active && follow.current ? follow.current.t16 / 4 : isPlaying ? playback.beat : undefined}
-          follow={follow.active || follow.result ? { cur: follow.current?.t16 ?? null, due: follow.isDue, done: follow.done, hands } : undefined}
+          follow={follow.active || follow.result ? { cur: follow.current?.t16 ?? null, due: follow.isDue, done: follow.done, hands, guide } : undefined}
           onChordClick={(i) => {
             setSelected(i);
             playNotes([voicings[i].bass, ...voicings[i].rh], 1.6);

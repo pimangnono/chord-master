@@ -2540,18 +2540,25 @@ textarea {
   color: var(--good);
 }
 
-/* follow-practice note states on the score */
-.sheet-hit.next {
-  box-shadow: 0 0 0 2px #ff9f43;
+/* follow-practice note states: the noteheads themselves change colour */
+.sheet-host .fol-cur path {
+  fill: #e5172b !important;
+  stroke: #e5172b !important;
 }
 
-.sheet-hit.cur {
-  background: rgba(255, 59, 72, 0.55);
-  box-shadow: 0 0 0 2px #ff3b48, 0 0 12px rgba(255, 59, 72, 0.6);
+.sheet-host .fol-next path {
+  fill: #f08a00 !important;
+  stroke: #f08a00 !important;
 }
 
-.sheet-hit.done {
-  background: rgba(47, 211, 138, 0.45);
+.sheet-host .fol-past path {
+  fill: #8f8aa8 !important;
+  stroke: #8f8aa8 !important;
+}
+
+.sheet-host .fol-done path {
+  fill: #1f9d63 !important;
+  stroke: #1f9d63 !important;
 }
 
 .follow-bar {

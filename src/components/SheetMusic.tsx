@@ -33,6 +33,8 @@ interface Hit {
   t16: number;
   /** a new key press (not a tie continuation) */
   onset: boolean;
+  /** the rendered notehead, recoloured during 따라치기 */
+  el?: SVGElement;
 }
 
 export interface FollowView {
@@ -42,6 +44,8 @@ export interface FollowView {
   due: boolean;
   done: Set<number>;
   hands: 'both' | 'rh' | 'lh';
+  /** beat position in 16ths, for the timing guide on the hand not being practised */
+  guide?: number | null;
 }
 
 interface Mark {
@@ -217,7 +221,7 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
             heads.forEach((h, i) => {
               const name = item.notes![i];
               if (!name) return;
-              newHits.push({ x: h.getAbsoluteX(), y: h.getY(), w: h.getWidth() || 10, note: name, chord: chords[item.chord]?.symbol ?? '', hand, t16, onset });
+              newHits.push({ x: h.getAbsoluteX(), y: h.getY(), w: h.getWidth() || 10, note: name, chord: chords[item.chord]?.symbol ?? '', hand, t16, onset, el: h.getSVGElement() });
             });
           }
         }
@@ -244,6 +248,27 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
   const activeBar = activeBeat !== undefined && activeBeat >= 0 ? Math.floor(activeBeat / 4) : -1;
   const box = boxes[activeBar];
   const cursorRef = useRef<HTMLDivElement>(null);
+
+  // 따라치기: colour the noteheads themselves (red = play now, orange = coming up, green = played)
+  useEffect(() => {
+    // the other hand lights up on its own beats, following the practice clock
+    const guide = follow?.guide;
+    let latest = -1;
+    if (follow && follow.hands !== 'both' && guide !== null && guide !== undefined) {
+      for (const h of hits) if (h.onset && h.hand !== follow.hands && h.t16 <= guide + 0.01 && h.t16 > latest) latest = h.t16;
+    }
+    for (const h of hits) {
+      if (!h.el) continue;
+      const practised = !!follow && (follow.hands === 'both' || follow.hands === h.hand);
+      let state = '';
+      if (follow && h.onset && practised) state = h.t16 === follow.cur ? (follow.due ? 'cur' : 'next') : follow.done.has(h.t16) ? 'done' : '';
+      else if (follow && h.onset && latest >= 0) state = h.t16 === latest ? 'cur' : h.t16 < latest ? 'past' : '';
+      h.el.classList.toggle('fol-cur', state === 'cur');
+      h.el.classList.toggle('fol-next', state === 'next');
+      h.el.classList.toggle('fol-done', state === 'done');
+      h.el.classList.toggle('fol-past', state === 'past');
+    }
+  }, [hits, follow]);
   // keep the practised bar on screen
   useEffect(() => {
     if (follow?.cur !== null && follow?.cur !== undefined) cursorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -259,12 +284,10 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
         </button>
       ))}
       {hits.map((h, i) => {
-        const inHand = follow && (follow.hands === 'both' || follow.hands === h.hand) && h.onset;
-        const state = !inHand ? '' : h.t16 === follow.cur ? (follow.due ? ' cur' : ' next') : follow.done.has(h.t16) ? ' done' : '';
         return (
         <span
           key={i}
-          className={`sheet-hit${tip === h ? ' on' : ''}${state}`}
+          className={`sheet-hit${tip === h ? ' on' : ''}`}
           style={{ left: h.x - 3, top: h.y - 6, width: h.w + 6 }}
           onMouseEnter={() => setTip(h)}
           onMouseLeave={() => setTip((t) => (t === h ? null : t))}
