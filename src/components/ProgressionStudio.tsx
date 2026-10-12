@@ -12,6 +12,10 @@ import { BassSuggestion, bassSuggestions } from '../theory/inversion';
 import { convertMode, parallelKey } from '../theory/mode';
 import { noteRole, voiceProgression, VoicingMode } from '../theory/voicing';
 import { InversionGuide } from './InversionGuide';
+import { buildFollowSteps, Hands } from '../notation/score';
+import { buildArrangement } from '../theory/arrange';
+import { connectMidiHub, useMidi } from '../audio/midiHub';
+import { timingLabel, useFollow } from './useFollow';
 import { useStore } from '../store';
 import { Piano } from './Piano';
 import { RhythmGrid } from './RhythmGrid';
@@ -95,6 +99,15 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
   const current = isPlaying && playback.chord >= 0 ? playback.chord : selected;
   const v = voicings[current];
 
+  // ── 따라치기 (wait-mode practice on the score) ──
+  const [hands, setHands] = useState<Hands>('rh');
+  const [octaveFree, setOctaveFree] = useState(false);
+  const [showKeys, setShowKeys] = useState(true);
+  const sheetRhythm = view === 'accomp' ? rhythm : getRhythm('whole');
+  const followSteps = useMemo(() => buildFollowSteps(buildArrangement(keyed, sheetRhythm, voicingMode), hands), [keyed, sheetRhythm, voicingMode, hands]);
+  const follow = useFollow(followSteps, bpm, octaveFree);
+  const midiStatus = useMidi((s) => s.status);
+
   type Settings = { key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean; voicing: VoicingMode; slashes: Record<number, string>; flip: boolean };
   const restart = (patch: Partial<Settings>) => {
     if (!isPlaying) return;
@@ -157,6 +170,10 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
     setToast('내 라이브러리에 저장했어요 ♥');
     setTimeout(() => setToast(null), 2200);
   };
+
+  const followMarks = new Map<number, 'active' | 'root' | 'hint' | 'wrong'>();
+  if (follow.active && follow.current && showKeys) for (const m of follow.current.notes) followMarks.set(m, follow.isDue ? 'root' : 'hint');
+  if (follow.wrongNote !== null) followMarks.set(follow.wrongNote, 'wrong');
 
   const recommended = genre ? GENRE_BY_ID[genre].rhythms : [];
   const sortedRhythms = [...RHYTHMS].sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id)));
@@ -279,7 +296,18 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
         })}
       </div>
 
-      <Piano from={36} to={84} marks={marks} captions={captions} preferFlats={flats} keyName={key} onDown={(m) => playNotes([Note.fromMidi(m)], 1.2)} />
+      <Piano
+        from={36}
+        to={84}
+        marks={follow.active ? followMarks : marks}
+        captions={follow.active ? undefined : captions}
+        preferFlats={flats}
+        keyName={key}
+        onDown={(m) => {
+          playNotes([Note.fromMidi(m)], 1.2);
+          follow.press(m);
+        }}
+      />
 
       <section className="card">
         <div className="card-head">
@@ -294,12 +322,83 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
           </div>
         </div>
         <p className="muted small">음표에 마우스를 올리면 계이름(고정도·이동도)과 코드 속 역할이 보여요. 클릭하면 소리가 나요.</p>
+        <div className={`follow-bar${follow.active ? ' on' : ''}`}>
+          <div className="follow-controls">
+            <b>🎹 따라치기</b>
+            {follow.active ? (
+              <button className="btn small danger-solid" onClick={follow.stop}>
+                ■ 그만하기
+              </button>
+            ) : (
+              <button
+                className="btn small"
+                onClick={() => {
+                  if (isPlaying) stopPlayback();
+                  follow.start();
+                }}
+              >
+                ▶ 시작
+              </button>
+            )}
+            <div className="seg">
+              {(
+                [
+                  ['rh', '오른손'],
+                  ['lh', '왼손'],
+                  ['both', '양손'],
+                ] as [Hands, string][]
+              ).map(([h, label]) => (
+                <button key={h} className={hands === h ? 'on' : ''} onClick={() => setHands(h)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="inline-check small">
+              <input type="checkbox" checked={octaveFree} onChange={(e) => setOctaveFree(e.target.checked)} /> 옥타브 상관없이
+            </label>
+            <label className="inline-check small">
+              <input type="checkbox" checked={showKeys} onChange={(e) => setShowKeys(e.target.checked)} /> 건반에 정답 표시
+            </label>
+            {midiStatus !== 'on' && midiStatus !== 'unsupported' && (
+              <button className="btn small ghost" onClick={() => connectMidiHub(true)}>
+                MIDI 피아노 연결
+              </button>
+            )}
+          </div>
+          {follow.active && (
+            <div className="follow-status">
+              <span>
+                {Math.min(follow.idx + 1, follow.total)} / {follow.total}
+              </span>
+              <div className="bar follow-progress">
+                <div style={{ width: `${(follow.idx / Math.max(1, follow.total)) * 100}%` }} />
+              </div>
+              <span className={follow.isDue ? 'due-txt' : 'muted'}>{follow.isDue ? '지금! 빨간 음표를 누르세요' : '곧 빨간색으로 바뀌어요…'}</span>
+              {follow.lastTiming !== null && <span className="pill">{timingLabel(follow.lastTiming)}</span>}
+              <span className="muted small">틀린 음 {follow.errors}</span>
+            </div>
+          )}
+          {!follow.active && follow.result && (
+            <div className="follow-status">
+              <b>🎉 완주!</b>
+              <span>
+                {follow.result.steps}번 누르기 · 틀린 음 {follow.result.errors}개 · 평균 박자 오차 {Math.round(follow.result.meanTiming)}ms · {Math.round(follow.result.seconds)}초
+              </span>
+            </div>
+          )}
+          {!follow.active && !follow.result && (
+            <p className="muted small">
+              박자에 맞춰 음표가 빨간색으로 바뀌면 그 음을 정확히 누르세요. 맞게 누를 때까지 기다려줘요. MIDI 피아노가 가장 정확하고, 화면 건반을 눌러도 돼요. 템포는 위 템포 슬라이더를 따라요.
+            </p>
+          )}
+        </div>
         <SheetMusic
           chords={keyed}
           rhythm={view === 'accomp' ? rhythm : getRhythm('whole')}
           keySig={key}
           voicing={voicingMode}
-          activeBeat={isPlaying ? playback.beat : undefined}
+          activeBeat={follow.active && follow.current ? follow.current.t16 / 4 : isPlaying ? playback.beat : undefined}
+          follow={follow.active || follow.result ? { cur: follow.current?.t16 ?? null, due: follow.isDue, done: follow.done, hands } : undefined}
           onChordClick={(i) => {
             setSelected(i);
             playNotes([voicings[i].bass, ...voicings[i].rh], 1.6);

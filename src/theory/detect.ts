@@ -1,3 +1,4 @@
+import { Chord, Note } from 'tonal';
 import { pcName } from './notes';
 
 /** Chord templates as semitone offsets from the root. `penalty` slightly disfavors rarer/bigger chords. */
@@ -96,4 +97,25 @@ export function detectFromMidi(midis: number[], preferFlats?: boolean): ChordGue
   exact.sort((a, b) => b.score - a.score);
   if (exact.length) return exact;
   return detectFromChroma(chromaVec, bass, preferFlats);
+}
+
+/**
+ * Does a played set of notes count as `target`? Any inversion or octave is
+ * fine; every played pitch class must belong to the chord; the perfect 5th
+ * and extensions (9, 11, 13) may be left out, as pianists usually do.
+ */
+export function chordMatches(played: number[], target: string): boolean {
+  const slash = target.match(/^(.*)\/([A-G][#b]*)$/);
+  const main = slash ? slash[1] : target;
+  const c = Chord.get(main);
+  if (c.empty || played.length < 2) return false;
+  const pcs = new Set(c.notes.map((n) => Note.chroma(n)!));
+  if (slash) pcs.add(Note.chroma(slash[2])!);
+  const got = new Set(played.map((m) => ((m % 12) + 12) % 12));
+  for (const p of got) if (!pcs.has(p)) return false;
+  return c.notes.every((n, i) => {
+    const ivl = c.intervals[i];
+    const optional = ivl === '5P' || /^(9|11|13)/.test(ivl);
+    return optional || got.has(Note.chroma(n)!);
+  });
 }

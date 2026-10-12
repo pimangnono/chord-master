@@ -3,7 +3,8 @@ export interface MidiConnection {
   disconnect: () => void;
 }
 
-export type MidiNoteHandler = (type: 'on' | 'off', note: number, velocity: number) => void;
+/** 'pedal' carries the sustain pedal state in `velocity` (1 = down, 0 = up) and note 64. */
+export type MidiNoteHandler = (type: 'on' | 'off' | 'pedal', note: number, velocity: number) => void;
 
 /** Connects to every Web MIDI input (digital pianos, controllers). Chrome only. */
 export async function connectMidi(onNote: MidiNoteHandler, onInputsChange?: (names: string[]) => void): Promise<MidiConnection> {
@@ -17,6 +18,7 @@ export async function connectMidi(onNote: MidiNoteHandler, onInputsChange?: (nam
     const vel = data[2];
     if (cmd === 0x90 && vel > 0) onNote('on', note, vel / 127);
     else if (cmd === 0x80 || (cmd === 0x90 && vel === 0)) onNote('off', note, 0);
+    else if (cmd === 0xb0 && note === 64) onNote('pedal', 64, vel >= 64 ? 1 : 0);
   };
   const attach = () => {
     const names: string[] = [];

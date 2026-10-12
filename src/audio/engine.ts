@@ -122,6 +122,15 @@ export function ensureAudio(): Promise<void> {
   return initPromise;
 }
 
+// When the app itself is making sound, microphone listeners should ignore what they hear.
+let busyUntil = 0;
+function markBusy(seconds: number) {
+  busyUntil = Math.max(busyUntil, performance.now() + (seconds + 1.2) * 1000);
+}
+export function appSoundBusy(): boolean {
+  return performance.now() < busyUntil || player.playing;
+}
+
 function freqs(notes: string[]): number[] {
   return notes.map((n) => Tone.Frequency(Note.midi(n) ?? 60, 'midi').toFrequency());
 }
@@ -129,6 +138,7 @@ function freqs(notes: string[]): number[] {
 export async function playNotes(notes: string[], duration = 1.4, velocity = 0.7) {
   await ensureAudio();
   if (!piano || !notes.length) return;
+  markBusy(duration);
   piano.triggerAttackRelease(freqs(notes), duration, Tone.now() + 0.02, velocity);
 }
 
@@ -136,6 +146,7 @@ export async function playNotes(notes: string[], duration = 1.4, velocity = 0.7)
 export async function playSequence(groups: string[][], gap = 0.6, duration = 0.9) {
   await ensureAudio();
   if (!piano) return;
+  markBusy(groups.length * gap + duration);
   const now = Tone.now() + 0.05;
   groups.forEach((g, i) => piano!.triggerAttackRelease(freqs(g), duration, now + i * gap, 0.7));
 }
@@ -147,6 +158,27 @@ export async function noteOn(note: string, velocity = 0.7) {
 
 export function noteOff(note: string) {
   piano?.triggerRelease(freqs([note]), Tone.now());
+}
+
+/** True once the browser has allowed audio (after a click or key press) and the piano is loaded. */
+export function audioReady(): boolean {
+  return !!piano && Tone.getContext().state === 'running';
+}
+
+/**
+ * Immediate note on/off for live input (MIDI). Unlike noteOn these never wait:
+ * before the first click the browser keeps audio suspended, and a queued note
+ * would sound late, so it is dropped instead.
+ */
+export function liveNoteOn(midi: number, velocity: number) {
+  if (!audioReady()) return false;
+  piano!.triggerAttack(Tone.Frequency(midi, 'midi').toFrequency(), Tone.now(), Math.max(0.05, velocity));
+  return true;
+}
+
+export function liveNoteOff(midi: number) {
+  if (!piano) return;
+  piano.triggerRelease(Tone.Frequency(midi, 'midi').toFrequency(), Tone.now());
 }
 
 export interface PlayOptions {

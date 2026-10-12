@@ -29,6 +29,19 @@ interface Hit {
   note: string;
   chord: string;
   hand: 'rh' | 'lh';
+  /** absolute position in 16ths */
+  t16: number;
+  /** a new key press (not a tie continuation) */
+  onset: boolean;
+}
+
+export interface FollowView {
+  /** t16 of the notes to play now, or null */
+  cur: number | null;
+  /** the beat has reached them (shown red) */
+  due: boolean;
+  done: Set<number>;
+  hands: 'both' | 'rh' | 'lh';
 }
 
 interface Mark {
@@ -51,6 +64,8 @@ export interface SheetMusicProps {
   keySig: string;
   activeBeat?: number;
   voicing?: VoicingMode;
+  /** wait-mode practice highlighting */
+  follow?: FollowView;
   onChordClick?: (index: number) => void;
 }
 
@@ -58,7 +73,7 @@ const LINE_H = 250;
 const TREBLE_Y = 30;
 const BASS_Y = 125;
 
-export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', onChordClick }: SheetMusicProps) {
+export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', follow, onChordClick }: SheetMusicProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -137,7 +152,7 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
 
         const build = (items: ScoreItem[], clef: 'treble' | 'bass', hand: 'rh' | 'lh') => {
           const notes: StaveNote[] = [];
-          const meta: { note: StaveNote; item: ScoreItem }[] = [];
+          const meta: { note: StaveNote; item: ScoreItem; t16: number; onset: boolean }[] = [];
           for (const item of items) {
             const pieces = splitDuration(item.start, item.len);
             pieces.forEach((p, pi) => {
@@ -147,7 +162,7 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
               if (p.dur.includes('d')) Dot.buildAndAttach([sn], { all: true });
               notes.push(sn);
               if (!rest) {
-                meta.push({ note: sn, item });
+                meta.push({ note: sn, item, t16: bi * 16 + p.start, onset: pi === 0 && !item.cont });
                 const prevKey = hand;
                 const pend = pending[prevKey];
                 if (pi === 0 && pend) {
@@ -197,12 +212,12 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
           [rh.meta, 'rh'],
           [lh.meta, 'lh'],
         ] as const) {
-          for (const { note, item } of list) {
+          for (const { note, item, t16, onset } of list) {
             const heads = [...note.noteHeads].sort((a, b) => b.getY() - a.getY());
             heads.forEach((h, i) => {
               const name = item.notes![i];
               if (!name) return;
-              newHits.push({ x: h.getAbsoluteX(), y: h.getY(), w: h.getWidth() || 10, note: name, chord: chords[item.chord]?.symbol ?? '', hand });
+              newHits.push({ x: h.getAbsoluteX(), y: h.getY(), w: h.getWidth() || 10, note: name, chord: chords[item.chord]?.symbol ?? '', hand, t16, onset });
             });
           }
         }
@@ -228,26 +243,35 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
 
   const activeBar = activeBeat !== undefined && activeBeat >= 0 ? Math.floor(activeBeat / 4) : -1;
   const box = boxes[activeBar];
+  const cursorRef = useRef<HTMLDivElement>(null);
+  // keep the practised bar on screen
+  useEffect(() => {
+    if (follow?.cur !== null && follow?.cur !== undefined) cursorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [activeBar, follow?.cur]);
 
   return (
     <div className="sheet" ref={wrap}>
-      {box && <div className="sheet-cursor" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
+      {box && <div ref={cursorRef} className="sheet-cursor" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
       <div ref={host} className="sheet-host" />
       {marks.map((m, i) => (
         <button key={i} className="sheet-chord" style={{ left: m.x - 4, top: m.y }} onClick={() => onChordClick?.(m.chord)}>
           {prettyChord(m.symbol)}
         </button>
       ))}
-      {hits.map((h, i) => (
+      {hits.map((h, i) => {
+        const inHand = follow && (follow.hands === 'both' || follow.hands === h.hand) && h.onset;
+        const state = !inHand ? '' : h.t16 === follow.cur ? (follow.due ? ' cur' : ' next') : follow.done.has(h.t16) ? ' done' : '';
+        return (
         <span
           key={i}
-          className={`sheet-hit${tip === h ? ' on' : ''}`}
+          className={`sheet-hit${tip === h ? ' on' : ''}${state}`}
           style={{ left: h.x - 3, top: h.y - 6, width: h.w + 6 }}
           onMouseEnter={() => setTip(h)}
           onMouseLeave={() => setTip((t) => (t === h ? null : t))}
           onClick={() => playNotes([h.note], 1)}
         />
-      ))}
+        );
+      })}
       {tip && (
         <div className="sheet-tip" style={{ left: tip.x + tip.w / 2, top: tip.y - 14 }}>
           <div className="sheet-tip-main">

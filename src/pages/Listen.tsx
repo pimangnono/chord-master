@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Note } from 'tonal';
 import { noteOff, noteOn, playNotes } from '../audio/engine';
 import { listAudioInputs, MicListener } from '../audio/listener';
-import { connectMidi, MidiConnection } from '../audio/midi';
+import { connectMidiHub, setMidiSound, useMidi } from '../audio/midiHub';
 import { Piano } from '../components/Piano';
 import { PROGRESSIONS } from '../data/progressions';
 import { SONGS } from '../data/songs';
@@ -56,16 +56,13 @@ export function ListenPage() {
   const [candidates, setCandidates] = useState<ChordGuess[]>([]);
   const [history, setHistory] = useState<string[]>([]);
   const [hint, setHint] = useState<string | null>(null);
-  const [midiInputs, setMidiInputs] = useState<string[]>([]);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState('');
-  const [midiSound, setMidiSound] = useState(false);
   const [estKey, setEstKey] = useState<string | null>(null);
   const saveProgression = useStore((s) => s.saveProgression);
   const [saved, setSaved] = useState(false);
 
   const listener = useRef<MicListener | null>(null);
-  const midi = useRef<MidiConnection | null>(null);
   const raf = useRef(0);
   const held = useRef(new Set<number>());
   const recent = useRef<string[]>([]);
@@ -189,8 +186,6 @@ export function ListenPage() {
     cancelAnimationFrame(raf.current);
     listener.current?.stop();
     listener.current = null;
-    midi.current?.disconnect();
-    midi.current = null;
     held.current.clear();
     setRunning(false);
     setLevel(0);
@@ -209,11 +204,7 @@ export function ListenPage() {
         listAudioInputs().then(setDevices);
         micLoop();
       } else if (source === 'midi') {
-        midi.current = await connectMidi(
-          (type, note) => (type === 'on' ? pressNote(note, midiSoundRef.current) : releaseNote(note, midiSoundRef.current)),
-          setMidiInputs,
-        );
-        setMidiInputs(midi.current.inputs);
+        await connectMidiHub(true);
       }
       setRunning(true);
     } catch (e) {
@@ -222,8 +213,16 @@ export function ListenPage() {
       stop();
     }
   };
-  const midiSoundRef = useRef(midiSound);
-  midiSoundRef.current = midiSound;
+  // MIDI comes from the app-wide connection (sidebar); it already makes the sound.
+  const midiState = useMidi();
+  useEffect(() => {
+    if (source !== 'midi') return;
+    held.current = new Set(midiState.held);
+    evaluateHeld();
+  }, [source, midiState.held, evaluateHeld]);
+  useEffect(() => {
+    if (source === 'midi' && midiState.status === 'on') setRunning(true);
+  }, [source, midiState.status]);
 
   const switchSource = (s: Source) => {
     stop();
@@ -276,7 +275,7 @@ export function ListenPage() {
           </button>
         </div>
         <div className="row gap wrap">
-          {source !== 'keys' &&
+          {source === 'mic' &&
             (running ? (
               <button className="btn play on" onClick={stop}>
                 ■ 듣기 중지
@@ -286,6 +285,11 @@ export function ListenPage() {
                 ● 듣기 시작
               </button>
             ))}
+          {source === 'midi' && midiState.status !== 'on' && (
+            <button className="btn play" onClick={start} disabled={midiState.status === 'connecting'}>
+              🎹 MIDI 연결
+            </button>
+          )}
           {source === 'mic' && (
             <>
               <label className="field grow">
@@ -318,10 +322,18 @@ export function ListenPage() {
           )}
           {source === 'midi' && (
             <>
-              <button className={`chip-toggle${midiSound ? ' on' : ''}`} onClick={() => setMidiSound((x) => !x)}>
-                앱에서도 소리 내기
+              <button className={`chip-toggle${midiState.sound ? ' on' : ''}`} onClick={() => setMidiSound(!midiState.sound)}>
+                앱 피아노 소리 내기
               </button>
-              <span className="muted small">{running ? (midiInputs.length ? `연결됨: ${midiInputs.join(', ')}` : 'MIDI 장치를 연결해 주세요 (USB/블루투스)') : ''}</span>
+              <span className="muted small">
+                {midiState.status === 'on'
+                  ? midiState.inputs.length
+                    ? `연결됨: ${midiState.inputs.join(', ')} · 다른 페이지에서도 계속 연결돼 있어요`
+                    : 'MIDI 장치를 연결해 주세요 (USB/블루투스)'
+                  : midiState.status === 'error'
+                    ? midiState.error
+                    : ''}
+              </span>
             </>
           )}
           {source === 'keys' && <span className="muted small">아래 건반을 클릭하거나 키보드로 연주: 아랫줄 Z S X D C V… (도3~), 윗줄 Q 2 W 3 E R… (도4~)</span>}

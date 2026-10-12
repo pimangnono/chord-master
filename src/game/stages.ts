@@ -10,7 +10,7 @@ import { convertMode } from '../theory/mode';
 export interface Question {
   prompt: string;
   sub?: string;
-  kind: 'choice' | 'piano' | 'order';
+  kind: 'choice' | 'piano' | 'order' | 'play';
   choices?: string[];
   /** choice: the correct label; piano: pitch-class set (0-11); order: chips in order */
   answer: string | number[] | string[];
@@ -25,6 +25,10 @@ export interface Question {
   items?: string[];
   /** how the correct answer is shown in feedback and the 오답 노트 */
   answerText?: string;
+  /** play: chords to play on the piano, in order */
+  targets?: string[];
+  /** play: what each slot shows before it is played ("?", a numeral, the chord to convert) */
+  slotLabels?: string[];
 }
 
 export interface Stage {
@@ -34,6 +38,10 @@ export interface Stage {
   goal: string;
   lesson: { title: string; points: string[] };
   make: (rng: Rng) => Question;
+  /** progression = the play-on-the-piano chord progression track; theory = basics */
+  track?: 'progression' | 'theory';
+  /** questions per run (default QUESTIONS_PER_STAGE) */
+  count?: number;
 }
 
 export type Rng = () => number;
@@ -250,10 +258,12 @@ export const STAGES: Stage[] = [
       const sym = pick(rng, ['C', 'F', 'G', 'D', 'A', 'E', 'Am', 'Dm', 'Em', 'Cm', 'Gm', 'Fm', 'Bb', 'Eb', 'Cmaj7', 'Dm7', 'G7', 'Fmaj7', 'Am7', 'Bdim']);
       const c = Chord.get(sym);
       return {
-        prompt: `건반에서 ${prettyChord(sym)} 코드를 만들어 보세요`,
-        sub: '건반을 눌러 음을 선택하고 “확인”을 누르세요 (옥타브는 상관없어요)',
-        kind: 'piano',
-        answer: c.notes.map((n) => Note.chroma(n)!),
+        prompt: `피아노로 ${prettyChord(sym)} 코드를 쳐 보세요`,
+        sub: '자리바꿈·옥타브는 자유예요',
+        kind: 'play',
+        targets: [sym],
+        slotLabels: [prettyChord(sym)],
+        answer: prettyChord(sym),
         reveal: () => playNotes(voiced(sym), 1.6),
         answerText: `${prettyChord(sym)} = ${c.notes.map((n) => solfege(n)).join('·')}`,
         explain: `${prettyChord(sym)} = ${c.notes.map((n) => `${solfege(n)}(${n})`).join(' + ')}`,
@@ -317,33 +327,6 @@ export const STAGES: Stage[] = [
     },
   },
   {
-    id: 'cadence',
-    title: '다음 코드 맞히기',
-    icon: '🔮',
-    goal: '코드가 가고 싶어하는 방향을 느껴요',
-    lesson: {
-      title: '해결(Resolution)',
-      points: ['V7 → I: 가장 강한 해결 (정격종지)', 'X7 코드는 완전5도 아래로 가고 싶어해요 (부속 도미넌트)', 'bII7 → I: 반음 아래로 미끄러지는 트라이톤 대리'],
-    },
-    make: (rng) => {
-      const c = pick(rng, CADENCES);
-      const shown = c.chords.map((n) => romanToChord(n, c.key));
-      const answer = romanToChord(c.answer, c.key);
-      const pool = [...diatonicChords(c.key, /7|ø/.test(c.answer)).map((d) => d.symbol), answer];
-      return {
-        prompt: `${shown.map(prettyChord).join(' → ')} → ?`,
-        sub: `조성: ${c.key}`,
-        kind: 'choice',
-        choices: choicesWith(rng, prettyChord(answer), [...new Set(pool.map(prettyChord))]),
-        answer: prettyChord(answer),
-        play: () => playProgression(shown),
-        replayLabel: '진행 듣기',
-        reveal: () => playProgression([...shown, answer]),
-        explain: c.why,
-      };
-    },
-  },
-  {
     id: 'roman',
     title: '로마숫자 분석',
     icon: '🏛️',
@@ -398,10 +381,41 @@ export const STAGES: Stage[] = [
     },
   },
   {
+    id: 'cadence',
+    track: 'progression',
+    count: 6,
+    title: '다음 코드 치기',
+    icon: '🔮',
+    goal: '진행을 듣고, 이어질 코드를 피아노로 쳐요',
+    lesson: {
+      title: '해결(Resolution)',
+      points: ['V7 → I: 가장 강한 해결 (정격종지)', 'X7 코드는 완전5도 아래로 가고 싶어해요 (부속 도미넌트)', 'bII7 → I: 반음 아래로 미끄러지는 트라이톤 대리', '답은 직접 쳐서 내요 — MIDI 피아노, 마이크, 화면 건반 모두 돼요'],
+    },
+    make: (rng) => {
+      const c = pick(rng, CADENCES);
+      const shown = c.chords.map((n) => romanToChord(n, c.key));
+      const answer = romanToChord(c.answer, c.key);
+      return {
+        prompt: `${shown.map(prettyChord).join(' → ')} → ?`,
+        sub: `조성: ${c.key} · 이어질 코드를 쳐 보세요`,
+        kind: 'play',
+        targets: [answer],
+        slotLabels: ['?'],
+        answer: prettyChord(answer),
+        play: () => playProgression(shown),
+        replayLabel: '진행 듣기',
+        reveal: () => playProgression([...shown, answer]),
+        explain: c.why,
+      };
+    },
+  },
+  {
     id: 'prog-fill',
+    track: 'progression',
+    count: 6,
     title: '진행 빈칸 채우기',
     icon: '🧩',
-    goal: '유명한 진행의 빠진 코드를 찾아요',
+    goal: '유명한 진행의 빠진 코드를 쳐요',
     lesson: {
       title: '진행은 “문장”이에요',
       points: ['진행마다 정해진 흐름이 있어요: 액시스 = I–V–vi–IV', '로마숫자로 외우면 어떤 조에서도 빈칸이 보여요', '모르겠으면 들어보세요 — 빈칸 자리에서 소리가 멈춰요'],
@@ -415,14 +429,13 @@ export const STAGES: Stage[] = [
       const key = pick(rng, p.key.endsWith('m') ? ['Am', 'Em', 'Dm', 'Cm', 'Gm'] : ['C', 'G', 'D', 'F', 'Bb', 'A', 'Eb']);
       const chords = progressionToChords(p.numerals, key).map((c) => c.symbol);
       const hole = 1 + Math.floor(rng() * (chords.length - 1));
-      const answer = prettyChord(chords[hole]);
-      const pool2 = [...diatonicChords(key).map((d) => prettyChord(d.symbol)), ...diatonicChords(key, true).map((d) => prettyChord(d.symbol)), ...chords.map(prettyChord)];
       return {
         prompt: chords.map((c, i) => (i === hole ? '?' : prettyChord(c))).join(' – '),
-        sub: `“${p.name}” · 조성 ${key}`,
-        kind: 'choice',
-        choices: choicesWith(rng, answer, pool2),
-        answer,
+        sub: `“${p.name}” · 조성 ${key} · 빈칸의 코드를 쳐 보세요`,
+        kind: 'play',
+        targets: [chords[hole]],
+        slotLabels: ['?'],
+        answer: prettyChord(chords[hole]),
         play: () => playProgression(chords.slice(0, hole), 0.9),
         replayLabel: '빈칸 앞까지 듣기',
         reveal: () => playProgression(chords, 0.9),
@@ -432,40 +445,42 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'prog-order',
-    title: '진행 순서 맞추기',
-    icon: '🔀',
-    goal: '섞인 코드를 진행 순서대로 놓아요',
+    track: 'progression',
+    count: 5,
+    title: '로마숫자 보고 진행 치기',
+    icon: '🎼',
+    goal: '로마숫자 진행을 주어진 조에서 바로 쳐요',
     lesson: {
-      title: '순서가 곧 진행의 이름',
-      points: ['같은 코드 네 개도 순서가 바뀌면 다른 진행 (I–V–vi–IV vs vi–IV–I–V)', '첫 코드가 토닉(I 또는 i)인지, 마지막이 다시 처음으로 이어지는지 생각해 보세요', '코드 칩을 순서대로 누르세요'],
+      title: '로마숫자 = 조성 안의 자리',
+      points: ['I–V–vi–IV를 G장조에서: G D Em C', '대문자 = 장3화음, 소문자 = 단3화음, 7·maj7은 그대로 붙여요', '코드를 하나씩 순서대로 치면 칸이 채워져요'],
     },
     make: (rng) => {
       const pool = PROGRESSIONS.filter((p) => {
-        const syms = parseBars(p.numerals).map((c) => c.symbol);
-        return syms.length === 4 && new Set(syms).size === 4;
+        const n = parseBars(p.numerals).length;
+        return n === 4 && p.difficulty <= 2;
       });
       const p = pick(rng, pool);
       const key = pick(rng, p.key.endsWith('m') ? ['Am', 'Em', 'Dm'] : ['C', 'G', 'F', 'D']);
-      const chords = progressionToChords(p.numerals, key).map((c) => prettyChord(c.symbol));
-      let items = shuffle(rng, chords);
-      if (items.join() === chords.join()) items = [...items.slice(1), items[0]];
+      const chords = progressionToChords(p.numerals, key).map((c) => c.symbol);
       return {
-        prompt: `“${p.name}”을 ${key}에서 순서대로`,
+        prompt: `“${p.name}”을 ${key}에서 쳐 보세요`,
         sub: p.numerals.replace(/\s*\|\s*/g, ' – '),
-        kind: 'order',
-        items,
-        answer: chords,
-        answerText: chords.join(' – '),
-        reveal: () => playProgression(progressionToChords(p.numerals, key).map((c) => c.symbol), 0.9),
-        explain: `${p.description}`,
+        kind: 'play',
+        targets: chords,
+        slotLabels: parseBars(p.numerals).map((c) => c.symbol),
+        answer: chords.map(prettyChord).join(' – '),
+        reveal: () => playProgression(chords, 0.9),
+        explain: p.description,
       };
     },
   },
   {
     id: 'prog-transpose',
+    track: 'progression',
+    count: 5,
     title: '진행 조옮김',
     icon: '🚚',
-    goal: '같은 진행을 다른 조로 옮겨요',
+    goal: '같은 진행을 다른 조로 옮겨서 쳐요',
     lesson: {
       title: '조옮김 = 로마숫자는 그대로, 코드 이름만 이동',
       points: ['C장조 I–V–vi–IV = C G Am F', 'G장조로 옮기면 모든 근음이 완전5도 위로: G D Em C', '장·단(메이저/마이너) 성격은 그대로 유지돼요'],
@@ -476,37 +491,32 @@ export const STAGES: Stage[] = [
       const keys = ['C', 'G', 'D', 'F', 'Bb', 'A', 'E', 'Eb'];
       const from = pick(rng, keys);
       const to = pick(rng, keys.filter((k) => k !== from));
-      const src = progressionToChords(p.numerals, from).map((c) => prettyChord(c.symbol));
-      const answer = progressionToChords(p.numerals, to).map((c) => prettyChord(c.symbol)).join(' – ');
-      const near = keys.filter((k) => k !== to && k !== from);
-      const wrongKey = progressionToChords(p.numerals, pick(rng, near)).map((c) => prettyChord(c.symbol)).join(' – ');
-      const flipped = progressionToChords(p.numerals, to).map((c, i) => {
-        const sym = prettyChord(c.symbol);
-        return i === 2 ? (sym.includes('m') ? sym.replace('m', '') : sym.replace(/^([A-G][♯♭]?)/, '$1m')) : sym;
-      }).join(' – ');
-      const other = pick(rng, pool.filter((x) => x.id !== p.id));
-      const otherProg = progressionToChords(other.numerals, to).map((c) => prettyChord(c.symbol)).join(' – ');
+      const src = progressionToChords(p.numerals, from).map((c) => c.symbol);
+      const dst = progressionToChords(p.numerals, to).map((c) => c.symbol);
       return {
-        prompt: `${src.join(' – ')}  →  ${to}장조로 옮기면?`,
-        sub: `원래 조성 ${from}장조 · ${p.numerals.replace(/\s*\|\s*/g, ' – ')}`,
-        kind: 'choice',
-        choices: shuffle(rng, [...new Set([answer, wrongKey, flipped, otherProg])]),
-        answer,
-        play: () => playProgression(progressionToChords(p.numerals, from).map((c) => c.symbol), 0.9),
+        prompt: `${src.map(prettyChord).join(' – ')}  →  ${to}장조로`,
+        sub: `${from}장조의 진행을 ${to}장조로 옮겨서 쳐 보세요`,
+        kind: 'play',
+        targets: dst,
+        slotLabels: parseBars(p.numerals).map((c) => c.symbol),
+        answer: dst.map(prettyChord).join(' – '),
+        play: () => playProgression(src, 0.9),
         replayLabel: '원래 진행 듣기',
-        reveal: () => playProgression(progressionToChords(p.numerals, to).map((c) => c.symbol), 0.9),
-        explain: `로마숫자 ${p.numerals.replace(/\s*\|\s*/g, ' – ')}를 ${to}장조에서 읽으면 ${answer}`,
+        reveal: () => playProgression(dst, 0.9),
+        explain: `로마숫자 ${p.numerals.replace(/\s*\|\s*/g, ' – ')}를 ${to}장조에서 읽으면 ${dst.map(prettyChord).join(' – ')}`,
       };
     },
   },
   {
     id: 'prog-mode',
-    title: '장조 ↔ 단조 바꾸기',
+    track: 'progression',
+    count: 5,
+    title: '장조 ↔ 단조 바꿔 치기',
     icon: '🌗',
-    goal: '같은 진행을 어두운/밝은 분위기로 바꿔요',
+    goal: '같은 진행을 어두운 분위기로 바꿔서 쳐요',
     lesson: {
       title: '같은 으뜸음, 다른 분위기',
-      points: ['C장조 → C단조: 미·라·시가 반음 내려가요 (미♭·라♭·시♭)', 'C–G–Am–F 는 Cm–G–A♭–Fm 이 돼요', 'V(G)는 해결감을 위해 장3화음 그대로 두는 경우가 많아요'],
+      points: ['C장조 → C단조: 미·라·시가 반음 내려가요 (미♭·라♭·시♭)', 'C–G–Am–F 는 Cm–G–A♭–Fm 이 돼요', 'V(G)는 해결감을 위해 장3화음 그대로 둬요'],
     },
     make: (rng) => {
       const pool = PROGRESSIONS.filter((p) => parseBars(p.numerals).length === 4 && !p.key.endsWith('m') && p.difficulty === 1);
@@ -514,24 +524,48 @@ export const STAGES: Stage[] = [
       const key = pick(rng, ['C', 'G', 'D', 'F', 'A']);
       const src = progressionToChords(p.numerals, key);
       const conv = convertMode(src, key);
-      const answer = conv.chords.map((c) => prettyChord(c.symbol)).join(' – ');
-      // relative minor (same chords, different tonic) and a naive "make everything minor"
-      const naive = src.map((c) => {
-        const sym = prettyChord(c.symbol);
-        return /m(?!aj)/.test(sym) ? sym : sym.replace(/^([A-G][♯♭]?)/, '$1m');
-      }).join(' – ');
-      const onlyFirst = [prettyChord(conv.chords[0].symbol), ...src.slice(1).map((c) => prettyChord(c.symbol))].join(' – ');
-      const relative = src.map((c) => prettyChord(c.symbol)).join(' – ');
+      const dst = conv.chords.map((c) => c.symbol);
       return {
-        prompt: `${src.map((c) => prettyChord(c.symbol)).join(' – ')}  →  ${key}단조로?`,
-        sub: `${key}장조 “${p.name}”를 같은 으뜸음의 단조로`,
-        kind: 'choice',
-        choices: shuffle(rng, [...new Set([answer, naive, onlyFirst, relative])]),
-        answer,
+        prompt: `${src.map((c) => prettyChord(c.symbol)).join(' – ')}  →  ${key}단조로`,
+        sub: `${key}장조 “${p.name}”를 같은 으뜸음의 단조로 바꿔서 쳐 보세요`,
+        kind: 'play',
+        targets: dst,
+        slotLabels: src.map((c) => prettyChord(c.symbol)),
+        answer: dst.map(prettyChord).join(' – '),
         play: () => playProgression(src.map((c) => c.symbol), 0.9),
         replayLabel: '장조 진행 듣기',
-        reveal: () => playProgression(conv.chords.map((c) => c.symbol), 0.9),
-        explain: `${key}단조: 3·6·7음이 반음 내려가 ${answer}. 모든 코드를 마이너로 바꾸는 게 아니에요.`,
+        reveal: () => playProgression(dst, 0.9),
+        explain: `${key}단조: 3·6·7음이 반음 내려가 ${dst.map(prettyChord).join(' – ')}. 모든 코드를 마이너로 바꾸는 게 아니에요.`,
+      };
+    },
+  },
+  {
+    id: 'prog-ear',
+    track: 'progression',
+    count: 5,
+    title: '듣고 따라 치기',
+    icon: '🎧',
+    goal: '진행을 귀로 듣고 그대로 쳐요',
+    lesson: {
+      title: '귀로 진행 받아치기',
+      points: ['첫 코드는 알려줘요 — 거기서부터 베이스가 어디로 가는지 들어보세요', '밝게 들리면 장3화음(I·IV·V), 어둡게 들리면 단3화음(ii·iii·vi)', '몇 번이든 다시 들어도 돼요'],
+    },
+    make: (rng) => {
+      const ps = FAMOUS.map((id) => PROGRESSIONS.find((p) => p.id === id)!).filter((p) => p && parseBars(p.numerals).length === 4 && p.difficulty <= 2);
+      const p = pick(rng, ps);
+      const key = p.key.endsWith('m') ? 'Am' : pick(rng, ['C', 'G', 'F']);
+      const chords = progressionToChords(p.numerals, key).map((c) => c.symbol);
+      return {
+        prompt: '들리는 진행을 쳐 보세요',
+        sub: `조성 ${key} · 첫 코드는 ${prettyChord(chords[0])}`,
+        kind: 'play',
+        targets: chords,
+        slotLabels: chords.map((c, i) => (i === 0 ? prettyChord(c) : '?')),
+        answer: chords.map(prettyChord).join(' – '),
+        play: () => playProgression(chords, 1.1),
+        replayLabel: '다시 듣기',
+        reveal: () => playProgression(chords, 0.9),
+        explain: `${p.name}: ${p.numerals.replace(/\s*\|\s*/g, ' – ')}`,
       };
     },
   },

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Accidental, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow';
 import { ConfirmButton } from '../components/ConfirmButton';
 import { Piano } from '../components/Piano';
+import { PlayAnswer } from '../components/PlayAnswer';
 import { HEARTS, newSeed, Question, QUESTIONS_PER_STAGE, seededRng, Stage, STAGES, starsFor } from '../game/stages';
 import { vexKey } from '../notation/score';
 import { dueMistakes, levelFromXp, Mistake, REVIEW_INTERVALS, useStore } from '../store';
@@ -20,11 +21,11 @@ export function GamePage() {
   return stage ? <StagePlay key={stage.id} stage={stage} /> : <StageMap />;
 }
 
-function ReviewCard() {
+function ReviewCard({ track }: { track: Track }) {
   const game = useStore((s) => s.game);
   const due = dueMistakes(game);
   const total = Object.keys(game.mistakes ?? {}).length;
-  const cleared = STAGES.filter((s) => (game.stars[s.id] ?? 0) > 0).length;
+  const cleared = STAGES.filter((s) => (s.track ?? 'theory') === track && (game.stars[s.id] ?? 0) > 0).length;
   return (
     <section className="card review-card">
       <div>
@@ -47,7 +48,7 @@ function ReviewCard() {
         <Link to="/game/review" className={`btn${due.length ? '' : ' ghost'}`}>
           {due.length ? `오늘의 복습 ${due.length}문제 ▶` : '오늘 복습할 문제 없음'}
         </Link>
-        <Link to="/game/mix" className={`btn ghost${cleared ? '' : ' disabled-link'}`}>
+        <Link to={`/game/mix?track=${track}`} className={`btn ghost${cleared ? '' : ' disabled-link'}`}>
           🎲 깬 스테이지 섞어 풀기
         </Link>
         <Link to="/game/notes" className="btn ghost">
@@ -58,16 +59,33 @@ function ReviewCard() {
   );
 }
 
+type Track = 'progression' | 'theory';
+
 function StageMap() {
   const game = useStore((s) => s.game);
+  const [params, setParams] = useSearchParams();
+  const track: Track = params.get('track') === 'theory' ? 'theory' : 'progression';
   const lv = levelFromXp(game.xp);
-  const totalStars = STAGES.reduce((a, s) => a + (game.stars[s.id] ?? 0), 0);
+  const stages = STAGES.filter((s) => (s.track ?? 'theory') === track);
+  const trackStars = stages.reduce((a, s) => a + (game.stars[s.id] ?? 0), 0);
   return (
     <div className="page">
       <header className="page-head">
         <h1>화성학 게임</h1>
-        <p className="muted">스테이지를 깨면서 계이름부터 코드 진행까지! 하트 3개, 문제 {QUESTIONS_PER_STAGE}개.</p>
+        <p className="muted">
+          {track === 'progression'
+            ? '코드 진행을 듣고, 보고, 직접 피아노로 쳐서 답해요. MIDI 피아노·마이크(어쿠스틱 피아노)·화면 건반 모두 돼요.'
+            : '계이름부터 7th 코드까지 기초 화성학. 하트 3개, 문제 8개.'}
+        </p>
       </header>
+      <div className="tabs">
+        <button className={`tab${track === 'progression' ? ' active' : ''}`} onClick={() => setParams({})}>
+          🎹 코드 진행 (피아노로 풀기)
+        </button>
+        <button className={`tab${track === 'theory' ? ' active' : ''}`} onClick={() => setParams({ track: 'theory' })}>
+          📚 기초 화성학
+        </button>
+      </div>
       <div className="game-stats">
         <div className="stat">
           <b>Lv.{lv.level}</b>
@@ -78,46 +96,42 @@ function StageMap() {
           <span>총 XP</span>
         </div>
         <div className="stat">
-          <b>⭐ {totalStars}</b>
-          <span>/ {STAGES.length * 3} 별</span>
+          <b>⭐ {trackStars}</b>
+          <span>/ {stages.length * 3} 별</span>
         </div>
         <div className="stat">
           <b>🔥 {game.streakDays}</b>
           <span>연속 학습일</span>
         </div>
       </div>
-      <ReviewCard />
+      <ReviewCard track={track} />
       <div className="stage-map">
-        {STAGES.map((s, i) => {
+        {stages.map((s, i) => {
           const stars = game.stars[s.id] ?? 0;
-          const unlocked = i === 0 || (game.stars[STAGES[i - 1].id] ?? 0) > 0 || stars > 0;
-          const isProg = s.id.startsWith('prog-');
+          const unlocked = i === 0 || (game.stars[stages[i - 1].id] ?? 0) > 0 || stars > 0;
           return (
-            <div key={s.id}>
-              {isProg && s.id === 'prog-fill' && <h3 className="stage-chapter">코드 진행 챕터</h3>}
-              <div className={`stage-node ${i % 2 ? 'right' : 'left'}`}>
-                {unlocked ? (
-                  <Link to={`/game/${s.id}`} className={`stage-btn${stars ? ' done' : ''}`}>
-                    <span className="stage-icon">{s.icon}</span>
-                  </Link>
-                ) : (
-                  <span className="stage-btn locked">
-                    <span className="stage-icon">🔒</span>
-                  </span>
-                )}
-                <div className="stage-info">
-                  <b>
-                    {i + 1}. {s.title}
-                  </b>
-                  <span className="muted small">{s.goal}</span>
-                  <span className="stage-stars">
-                    {[1, 2, 3].map((n) => (
-                      <span key={n} className={n <= stars ? 'on' : ''}>
-                        ★
-                      </span>
-                    ))}
-                  </span>
-                </div>
+            <div key={s.id} className={`stage-node ${i % 2 ? 'right' : 'left'}`}>
+              {unlocked ? (
+                <Link to={`/game/${s.id}`} className={`stage-btn${stars ? ' done' : ''}`}>
+                  <span className="stage-icon">{s.icon}</span>
+                </Link>
+              ) : (
+                <span className="stage-btn locked">
+                  <span className="stage-icon">🔒</span>
+                </span>
+              )}
+              <div className="stage-info">
+                <b>
+                  {i + 1}. {s.title}
+                </b>
+                <span className="muted small">{s.goal}</span>
+                <span className="stage-stars">
+                  {[1, 2, 3].map((n) => (
+                    <span key={n} className={n <= stars ? 'on' : ''}>
+                      ★
+                    </span>
+                  ))}
+                </span>
               </div>
             </div>
           );
@@ -190,10 +204,12 @@ function QuizRunner({ deck, hearts: maxHearts, onFinish, header }: { deck: DeckI
     q.play?.();
   }, [q]);
 
-  const answer = (choice: string | null) => {
+  const answer = (choice: string | null, decided?: boolean) => {
     if (result) return;
     let ok: boolean;
-    if (q.kind === 'piano') {
+    if (decided !== undefined) {
+      ok = decided;
+    } else if (q.kind === 'piano') {
       const want = new Set(q.answer as number[]);
       const got = new Set([...sel].map((m) => m % 12));
       ok = want.size === got.size && [...want].every((p) => got.has(p));
@@ -334,6 +350,7 @@ function QuizRunner({ deck, hearts: maxHearts, onFinish, header }: { deck: DeckI
             )}
           </>
         )}
+        {q.kind === 'play' && <PlayAnswer q={q} done={!!result} onComplete={(ok) => answer(null, ok)} />}
         {q.kind === 'piano' && !result && (
           <button className="btn" disabled={!sel.size} onClick={() => answer(null)}>
             확인
@@ -372,7 +389,25 @@ function Result({ icon, title, lines, children }: { icon: string; title: string;
   );
 }
 
-const makeDeck = (stage: Stage, n = QUESTIONS_PER_STAGE): DeckItem[] => Array.from({ length: n }, () => ({ stage, seed: newSeed() }));
+/** A run of questions without repeats (re-rolls a seed when its question was already drawn). */
+function makeDeck(stage: Stage, n = stage.count ?? QUESTIONS_PER_STAGE): DeckItem[] {
+  const seen = new Set<string>();
+  const deck: DeckItem[] = [];
+  for (let i = 0; i < n; i++) {
+    let seed = newSeed();
+    for (let tries = 0; tries < 20; tries++) {
+      const q = stage.make(seededRng(seed));
+      const sig = q.prompt + '|' + (q.sub ?? '');
+      if (!seen.has(sig)) {
+        seen.add(sig);
+        break;
+      }
+      seed = newSeed();
+    }
+    deck.push({ stage, seed });
+  }
+  return deck;
+}
 
 function StagePlay({ stage }: { stage: Stage }) {
   const nav = useNavigate();
@@ -517,11 +552,13 @@ function ReviewPage() {
 /** Ten fresh questions drawn from stages already cleared (weighted toward weaker ones). */
 function MixPage() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const game = useStore((s) => s.game);
   const record = useStore((s) => s.recordGame);
   const [done, setDone] = useState<RunResult | null>(null);
   const deck = useMemo(() => {
-    const cleared = STAGES.filter((s) => (game.stars[s.id] ?? 0) > 0);
+    const track = params.get('track');
+    const cleared = STAGES.filter((s) => (game.stars[s.id] ?? 0) > 0 && (!track || (s.track ?? 'theory') === track));
     const weighted = cleared.flatMap((s) => Array(4 - (game.stars[s.id] ?? 0)).fill(s) as Stage[]);
     return Array.from({ length: weighted.length ? 10 : 0 }, () => ({ stage: weighted[Math.floor(Math.random() * weighted.length)], seed: newSeed() }));
   }, []);
@@ -538,7 +575,7 @@ function MixPage() {
   if (done) {
     return (
       <Result icon="🎲" title="섞어 풀기 끝!" lines={[`${done.total}문제 중 ${done.correct}개 정답 · +${done.xp} XP`, done.mistakes ? '틀린 문제는 오답 노트에 담았어요.' : '모두 맞혔어요!']}>
-        <button className="btn" onClick={() => nav('/game/mix?again=' + Date.now())}>
+        <button className="btn" onClick={() => nav(`/game/mix?track=${params.get('track') ?? ''}&again=${Date.now()}`)}>
           한 번 더
         </button>
         <button className="btn ghost" onClick={() => nav('/game')}>

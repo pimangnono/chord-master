@@ -11,6 +11,9 @@ import { Style, suggestNext } from '../theory/suggest';
 import { voiceChord } from '../theory/voicing';
 import { SavedProgression, useStore } from '../store';
 import { ConfirmButton } from '../components/ConfirmButton';
+import { useMidi } from '../audio/midiHub';
+import { detectFromMidi } from '../theory/detect';
+import { keyUsesFlats } from '../theory/keys';
 import { saveTextFile } from '../platform';
 
 export function LibraryPage() {
@@ -150,6 +153,9 @@ function Builder({ itemId }: { itemId: string }) {
       return n;
     });
 
+  const midiHeld = useMidi((s) => s.held);
+  const midiOn = useMidi((s) => s.status === 'on');
+  const midiChord = midiHeld.length >= 2 ? detectFromMidi(midiHeld, keyUsesFlats(key))[0]?.symbol : undefined;
   const last = chords[chords.length - 1]?.symbol;
   const suggestions = last ? suggestNext(last, key, { style, limit: 6 }) : [];
   const customOk = custom.trim() && !Chord.get(splitSlash(custom.trim())[0]).empty;
@@ -266,6 +272,16 @@ function Builder({ itemId }: { itemId: string }) {
               </button>
             ))}
           </div>
+          {midiOn && (
+            <div className="midi-add">
+              <span>🎹 지금 치는 코드:</span>
+              <b>{midiChord ? prettyChord(midiChord) : '—'}</b>
+              <button className="btn small" disabled={!midiChord} onClick={() => midiChord && add(midiChord)}>
+                + 진행에 추가
+              </button>
+              <span className="muted small">건반을 누른 채로 버튼을 누르세요</span>
+            </div>
+          )}
           <div className="row gap">
             <input className="search" placeholder="직접 입력 (예: Fmaj7, E7b9, G/B)" value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && customOk && (add(custom.trim()), setCustom(''))} />
             <button className="btn ghost" disabled={!customOk} onClick={() => (add(custom.trim()), setCustom(''))}>

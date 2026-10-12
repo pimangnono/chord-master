@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { HashRouter, MemoryRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { stopPlayback, useAudioStatus } from './audio/playback';
 import { getSyncState, IS_ARTIFACT, onSyncState, SyncState } from './platform';
+import { MidiPanel } from './components/MidiPanel';
 import { dueMistakes, levelFromXp, useStore } from './store';
 import { ErasPage } from './pages/Eras';
 import { GamePage } from './pages/Game';
@@ -74,6 +75,7 @@ function Sidebar() {
         ))}
       </nav>
       <div className="side-foot">
+        <MidiPanel />
         <div className="level">
           <div className="level-top">
             <b>Lv.{lv.level}</b>

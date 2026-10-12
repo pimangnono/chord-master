@@ -180,3 +180,33 @@ describe('arrangement & score', () => {
     expect(splitDuration(6, 10).map((d) => d.dur)).toEqual(['8', 'h']);
   });
 });
+
+describe('playing a chord', () => {
+  it('accepts inversions, octaves and omitted fifths/extensions', async () => {
+    const { chordMatches } = await import('./detect');
+    expect(chordMatches([60, 64, 67], 'C')).toBe(true);
+    expect(chordMatches([52, 60, 67, 72], 'C')).toBe(true); // first inversion, doubled root
+    expect(chordMatches([60, 64], 'C')).toBe(true); // no fifth
+    expect(chordMatches([60, 63, 67], 'C')).toBe(false); // minor third
+    expect(chordMatches([60, 64, 67, 70], 'C')).toBe(false); // extra Bb
+    expect(chordMatches([62, 65, 72], 'Dm7')).toBe(true); // shell without fifth
+    expect(chordMatches([62, 65, 69], 'Dm7')).toBe(false); // missing seventh
+    expect(chordMatches([60, 64, 71], 'Cmaj9')).toBe(true); // 9th optional
+    expect(chordMatches([59, 62, 67], 'G/B')).toBe(true);
+    expect(chordMatches([60], 'C')).toBe(false);
+  });
+});
+
+describe('follow practice steps', () => {
+  it('lists key presses per moment, by hand', async () => {
+    const { buildFollowSteps } = await import('../notation/score');
+    const chords = parseBars('C | G');
+    const arr = buildArrangement(chords, getRhythm('whole'));
+    const both = buildFollowSteps(arr, 'both');
+    expect(both.map((s) => s.t16)).toEqual([0, 16]);
+    expect(both[0].notes.length).toBe(4); // bass + 3-note right hand
+    expect(buildFollowSteps(arr, 'lh')[0].notes).toHaveLength(1);
+    const pop = buildFollowSteps(buildArrangement(chords, getRhythm('pop8')), 'rh');
+    expect(pop).toHaveLength(16); // eight 8th-note chords per bar
+  });
+});

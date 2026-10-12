@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { movableDo } from '../theory/keys';
 import { isBlackKey, midiToNote, solfege } from '../theory/notes';
 import { useStore } from '../store';
+import { useMidi } from '../audio/midiHub';
 
 export interface PianoProps {
   from?: number;
@@ -20,6 +21,7 @@ export interface PianoProps {
 
 export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, preferFlats, captions, keyName }: PianoProps) {
   const labels = useStore((s) => s.pianoLabels);
+  const midiHeld = useMidi((s) => s.held);
   const [hover, setHover] = useState<number | null>(null);
   const [down, setDown] = useState<number | null>(null);
   const keys = useMemo(() => {
@@ -55,7 +57,7 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
 
   const keyClass = (m: number) => {
     const mark = marks?.get(m);
-    return `key ${isBlackKey(m) ? 'black' : 'white'}${mark ? ' ' + mark : ''}${down === m ? ' pressed' : ''}`;
+    return `key ${isBlackKey(m) ? 'black' : 'white'}${mark ? ' ' + mark : ''}${down === m ? ' pressed' : ''}${midiHeld.includes(m) ? ' midi' : ''}`;
   };
 
   return (
@@ -63,6 +65,7 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
       {whites.map((m) => (
         <div
           key={m}
+          data-midi={m}
           className={keyClass(m)}
           style={{ left: `${posOfWhite(m) * whiteW}%`, width: `${whiteW}%` }}
           onPointerDown={(e) => {
@@ -89,6 +92,7 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
           return (
             <div
               key={m}
+              data-midi={m}
               className={keyClass(m)}
               style={{ left: `${(leftWhite + offset) * whiteW}%`, width: `${whiteW * 0.62}%` }}
               onPointerDown={(e) => {
