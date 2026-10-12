@@ -47,7 +47,7 @@ const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10, 11]; // natural minor + leading tone 
  * chord and for V(7) → I resolutions, and a small tiebreak from the
  * Krumhansl profile of all chord tones.
  */
-export function estimateKeyFromChords(symbols: string[], window = 8): KeyGuess[] {
+export function estimateKeyFromChords(symbols: string[], window = 8, decay = 0.85): KeyGuess[] {
   const recent = symbols.slice(-window);
   if (!recent.length) return [];
   const infos = recent.map((s) => {
@@ -67,7 +67,7 @@ export function estimateKeyFromChords(symbols: string[], window = 8): KeyGuess[]
       let score = 0;
       infos.forEach((c, i) => {
         if (c.root < 0) return;
-        const w = 0.85 ** (infos.length - 1 - i);
+        const w = decay ** (infos.length - 1 - i);
         if (c.pcs.every((p) => scale.has(p))) score += w;
         if (c.root === t && c.minor === minor) score += 0.35 * w;
         const prev = infos[i - 1];

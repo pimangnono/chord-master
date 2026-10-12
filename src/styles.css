@@ -2166,3 +2166,196 @@ textarea {
   padding: 10px 14px;
   font-size: 0.88rem;
 }
+
+/* ───────── song import ───────── */
+.import-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px dashed var(--line);
+}
+
+.import-box p {
+  margin: 0;
+}
+
+.parse-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.parse-section {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.parse-section > b {
+  min-width: 70px;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+}
+
+.meter.wide {
+  width: 220px;
+}
+
+/* ───────── review ───────── */
+.review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 20px;
+  align-items: center;
+}
+
+.review-card > .row {
+  grid-column: 1 / -1;
+}
+
+.review-card p {
+  margin: 0;
+}
+
+.review-stats {
+  display: flex;
+  gap: 18px;
+}
+
+.review-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.review-stats b {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-stats span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.disabled-link {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.stage-chapter {
+  text-align: center;
+  margin: 18px 0 6px;
+  color: var(--brand2);
+}
+
+.runner-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.review-tag {
+  align-self: flex-start;
+}
+
+.order-slots {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.order-slot {
+  min-width: 78px;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 2px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+  padding: 4px 8px;
+}
+
+.order-slot small {
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.order-slot.filled {
+  border-style: solid;
+  border-color: var(--brand);
+}
+
+.order-slot.right {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 18%, transparent);
+}
+
+.order-slot.wrong {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 18%, transparent);
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.note-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg2);
+  flex-wrap: wrap;
+}
+
+.note-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.note-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.good-txt {
+  color: var(--good);
+}
+
+.boxes {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.boxes i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.boxes i.on {
+  background: var(--good);
+}

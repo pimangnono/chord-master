@@ -5,14 +5,15 @@ import { playNotes } from '../audio/engine';
 import { Stars } from '../components/ProgressionCard';
 import { ProgressionStudio } from '../components/ProgressionStudio';
 import { GENRE_BY_ID, GENRES, GenreId } from '../data/progressions';
-import { getRhythm, RHYTHMS } from '../data/rhythms';
+import { getRhythm } from '../data/rhythms';
 import { Song, SONGS } from '../data/songs';
-import { keyLabel, MAJOR_KEYS, MINOR_KEYS, movableDo } from '../theory/keys';
+import { keyLabel, movableDo } from '../theory/keys';
 import { prettyChord, solfege, splitSlash } from '../theory/notes';
 import { chordToRoman, harmonicFunction, parseBars, secondaryLabel } from '../theory/roman';
 import { voiceChord } from '../theory/voicing';
 import { useStore } from '../store';
 import { ConfirmButton } from '../components/ConfirmButton';
+import { SongForm } from '../components/SongForm';
 
 function useAllSongs() {
   const custom = useStore((s) => s.customSongs);
@@ -35,7 +36,7 @@ export function SongsPage() {
           <p className="muted">배우고 싶은 노래를 고르면 코드 진행 분석과 단계별 반주법을 알려드려요.</p>
         </div>
         <button className="btn" onClick={() => setAdding(true)}>
-          + 내 노래 추가
+          + 노래 추가
         </button>
       </header>
       {adding && <SongForm onClose={() => setAdding(false)} />}
@@ -82,7 +83,7 @@ export function SongsPage() {
         {!filtered.length && <p className="muted">검색 결과가 없어요. 직접 노래를 추가해 보세요!</p>}
       </div>
       <p className="muted small">
-        수록곡의 코드는 학습용으로 간략화된 진행이며 가사·멜로디는 포함하지 않아요. 원하는 곡은 “내 노래 추가”로 코드를 직접 입력할 수 있어요.
+        수록곡의 코드는 학습용으로 간략화된 진행이며 가사·멜로디는 포함하지 않아요. 원하는 곡은 “노래 추가”에서 코드 악보를 붙여넣거나 음원 파일을 넣으면 코드를 자동으로 뽑아줘요.
       </p>
     </div>
   );
@@ -103,6 +104,7 @@ export function SongPage() {
   const [section, setSection] = useState(-1);
   const [step, setStep] = useState(3);
   const [rhythmOverride, setRhythmOverride] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const chords = useMemo(() => {
     if (!song) return [];
@@ -140,6 +142,10 @@ export function SongPage() {
           <p>{song.about}</p>
         </div>
         {song.custom && (
+          <div className="row gap">
+            <button className="btn ghost" onClick={() => setEditing(true)}>
+              편집
+            </button>
           <ConfirmButton
             label="삭제"
             confirmLabel="이 노래를 삭제할까요?"
@@ -149,8 +155,11 @@ export function SongPage() {
               nav('/songs');
             }}
           />
+          </div>
         )}
       </header>
+
+      {editing && song.custom && <SongForm initial={song} onClose={() => setEditing(false)} />}
 
       <div className="steps">
         {STEPS.map((s) => (
@@ -241,102 +250,6 @@ export function SongPage() {
             ))}
           </ul>
         </section>
-      </div>
-    </div>
-  );
-}
-
-function SongForm({ onClose }: { onClose: () => void }) {
-  const addSong = useStore((s) => s.addSong);
-  const nav = useNavigate();
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [key, setKey] = useState('C');
-  const [bpm, setBpm] = useState(90);
-  const [genre, setGenre] = useState<GenreId>('pop');
-  const [rhythm, setRhythm] = useState('pop8');
-  const [text, setText] = useState('벌스: C G | Am F\n후렴: F G | Em Am');
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = () => {
-    const sections = text
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l, i) => {
-        // "후렴: C G | Am F" — a name needs ": " (chord lengths like "C:3" have no space)
-        const m = l.match(/^([^|:]+?):\s+(.+)$/);
-        return m ? { name: m[1].trim(), chords: m[2].trim() } : { name: `파트 ${i + 1}`, chords: l };
-      });
-    if (!title.trim()) return setError('제목을 입력해 주세요.');
-    if (!sections.length) return setError('코드를 한 줄 이상 입력해 주세요.');
-    const bad = sections.flatMap((s) => parseBars(s.chords).map((c) => c.symbol)).filter((sym) => Chord.get(splitSlash(sym)[0]).empty);
-    if (bad.length) return setError(`알 수 없는 코드: ${[...new Set(bad)].join(', ')}`);
-    const id = 'custom-' + Date.now().toString(36);
-    addSong({ id, title: title.trim(), artist: artist.trim() || '직접 입력', genre, key, bpm, rhythm, difficulty: 1, sections, about: '내가 추가한 노래', tips: [], custom: true });
-    onClose();
-    nav(`/songs/${id}`);
-  };
-
-  return (
-    <div className="card form">
-      <h3>내 노래 추가</h3>
-      <div className="form-grid">
-        <label className="field">
-          <span>제목</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>아티스트</span>
-          <input value={artist} onChange={(e) => setArtist(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>조성</span>
-          <select value={key} onChange={(e) => setKey(e.target.value)}>
-            {[...MAJOR_KEYS, ...MINOR_KEYS].map((k) => (
-              <option key={k} value={k}>
-                {keyLabel(k)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>BPM</span>
-          <input type="number" min={40} max={220} value={bpm} onChange={(e) => setBpm(+e.target.value)} />
-        </label>
-        <label className="field">
-          <span>장르</span>
-          <select value={genre} onChange={(e) => setGenre(e.target.value as GenreId)}>
-            {GENRES.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>반주 리듬</span>
-          <select value={rhythm} onChange={(e) => setRhythm(e.target.value)}>
-            {RHYTHMS.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <label className="field">
-        <span>코드 (한 줄에 한 파트 · 마디는 | 로 구분 · 한 마디에 여러 코드는 띄어쓰기)</span>
-        <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <div className="row gap">
-        <button className="btn" onClick={submit}>
-          추가하기
-        </button>
-        <button className="btn ghost" onClick={onClose}>
-          취소
-        </button>
       </div>
     </div>
   );

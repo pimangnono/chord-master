@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { HashRouter, MemoryRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { stopPlayback, useAudioStatus } from './audio/playback';
 import { getSyncState, IS_ARTIFACT, onSyncState, SyncState } from './platform';
-import { levelFromXp, useStore } from './store';
+import { dueMistakes, levelFromXp, useStore } from './store';
 import { ErasPage } from './pages/Eras';
 import { GamePage } from './pages/Game';
 import { GenresPage } from './pages/Genres';
@@ -45,6 +45,7 @@ function SyncBadge() {
 function Sidebar() {
   const xp = useStore((s) => s.game.xp);
   const saved = useStore((s) => s.saved.length);
+  const due = useStore((s) => dueMistakes(s.game).length);
   const labels = useStore((s) => s.pianoLabels);
   const setLabels = useStore((s) => s.setPianoLabels);
   const audio = useAudioStatus();
@@ -64,6 +65,11 @@ function Sidebar() {
             <span className="nav-icon">{n.icon}</span>
             <span className="nav-label">{n.label}</span>
             {n.to === '/library' && saved > 0 && <span className="badge">{saved}</span>}
+            {n.to === '/game' && due > 0 && (
+              <span className="badge" title="오늘 복습할 문제">
+                {due}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

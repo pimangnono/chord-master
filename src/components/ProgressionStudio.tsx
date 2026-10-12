@@ -9,6 +9,7 @@ import { intervalBetweenKeys, keyLabel, keyOptionsFor, keyUsesFlats, parseKey, t
 import { prettyChord } from '../theory/notes';
 import { ChordEvent, chordToRoman, secondaryLabel } from '../theory/roman';
 import { BassSuggestion, bassSuggestions } from '../theory/inversion';
+import { convertMode, parallelKey } from '../theory/mode';
 import { noteRole, voiceProgression, VoicingMode } from '../theory/voicing';
 import { InversionGuide } from './InversionGuide';
 import { useStore } from '../store';
@@ -45,8 +46,14 @@ export function shortRole(role?: string) {
   );
 }
 
-export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialBpm, rhythm: initialRhythm, genre, source, onRhythmChange }: StudioProps) {
-  const [key, setKey] = useState(baseKey);
+export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: inputKey, bpm: initialBpm, rhythm: initialRhythm, genre, source, onRhythmChange }: StudioProps) {
+  const [key, setKey] = useState(inputKey);
+  /** true = play the progression in the parallel mode (장조 ↔ 단조) */
+  const [flip, setFlip] = useState(false);
+  const converted = useMemo(() => convertMode(inputChords, inputKey), [inputChords, inputKey]);
+  const chords = flip ? converted.chords : inputChords;
+  const baseKey = flip ? converted.key : inputKey;
+  const inputMinor = parseKey(inputKey).minor;
   const [rhythmId, setRhythmId] = useState(initialRhythm);
   const [bpm, setBpm] = useState(initialBpm);
   const [loop, setLoop] = useState(true);
@@ -66,7 +73,10 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
   const audio = useAudioStatus();
   const isPlaying = playback.owner === owner;
 
-  useEffect(() => setKey(baseKey), [baseKey]);
+  useEffect(() => {
+    setKey(inputKey);
+    setFlip(false);
+  }, [inputKey, inputChords]);
   useEffect(() => setRhythmId(initialRhythm), [initialRhythm]);
   useEffect(() => setBpm(initialBpm), [initialBpm]);
   useEffect(() => setSaveName(title), [title]);
@@ -85,13 +95,14 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
   const current = isPlaying && playback.chord >= 0 ? playback.chord : selected;
   const v = voicings[current];
 
-  type Settings = { key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean; voicing: VoicingMode; slashes: Record<number, string> };
+  type Settings = { key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean; voicing: VoicingMode; slashes: Record<number, string>; flip: boolean };
   const restart = (patch: Partial<Settings>) => {
     if (!isPlaying) return;
-    const next: Settings = { key, rhythm: rhythmId, loop, drums, muteLH, muteRH, voicing: voicingMode, slashes, ...patch };
-    const iv = intervalBetweenKeys(baseKey, next.key);
+    const next: Settings = { key, rhythm: rhythmId, loop, drums, muteLH, muteRH, voicing: voicingMode, slashes, flip, ...patch };
+    const src = next.flip ? converted : { key: inputKey, chords: inputChords };
+    const iv = intervalBetweenKeys(src.key, next.key);
     startPlayback(owner, {
-      chords: chords.map((c, i) => ({ ...c, symbol: next.slashes[i] ?? transposeChord(c.symbol, iv) })),
+      chords: src.chords.map((c, i) => ({ ...c, symbol: next.slashes[i] ?? transposeChord(c.symbol, iv) })),
       rhythm: getRhythm(next.rhythm),
       bpm,
       loop: next.loop,
@@ -105,6 +116,14 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
   const toggle = () => {
     if (isPlaying) stopPlayback();
     else startPlayback(owner, { chords: keyed, rhythm, bpm, loop, drums, muteLH, muteRH, voicing: voicingMode });
+  };
+
+  const changeMode = (toFlip: boolean) => {
+    if (toFlip === flip) return;
+    const nextKey = parallelKey(key);
+    setFlip(toFlip);
+    setKey(nextKey);
+    restart({ flip: toFlip, key: nextKey, slashes: {} });
   };
 
   const changeVoicing = (m: VoicingMode) => {
@@ -176,6 +195,17 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
             ))}
           </select>
         </label>
+        <div className="field">
+          <span>장조 · 단조</span>
+          <div className="seg">
+            <button className={!flip ? 'on' : ''} onClick={() => changeMode(false)} title="원래 조성">
+              {inputMinor ? '단조' : '장조'} (원곡)
+            </button>
+            <button className={flip ? 'on' : ''} onClick={() => changeMode(true)} title="같은 으뜸음의 다른 조로 바꿔요 (예: C장조 ↔ C단조)">
+              {inputMinor ? '장조로' : '단조로'} 바꾸기
+            </button>
+          </div>
+        </div>
         <label className="field">
           <span>반주 리듬</span>
           <select value={rhythmId} onChange={(e) => changeRhythm(e.target.value)}>
@@ -218,6 +248,13 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
+      {flip && (
+        <p className="notice">
+          {inputMinor
+            ? '단조 진행을 같은 으뜸음의 장조로 바꿨어요. 음계의 3·6·7음이 반음씩 올라가서(예: 미♭→미, 라♭→라, 시♭→시) 밝은 분위기가 돼요.'
+            : '장조 진행을 같은 으뜸음의 단조로 바꿨어요. 음계의 3·6·7음이 반음씩 내려가서(예: 미→미♭, 라→라♭, 시→시♭) 어두운 분위기가 돼요. 도미넌트(V)는 해결감을 위해 이끈음을 그대로 둬요.'}
+        </p>
+      )}
       {audio === 'fallback' && <p className="muted small">피아노 샘플을 불러오지 못해 신디사이저 소리로 재생해요 (인터넷 연결 확인).</p>}
 
       <div className="chord-row">
