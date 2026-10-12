@@ -31,6 +31,7 @@ export function ProgressionCard({ p, active, onClick }: { p: Progression; active
             {GENRE_BY_ID[g].name}
           </span>
         ))}
+        {p.subtype && <span className="tag plain">{p.genres.map((g) => GENRE_BY_ID[g].subtypes?.find((s) => s.id === p.subtype)?.name).find(Boolean) ?? p.subtype}</span>}
         {p.era && <span className="tag plain">{p.era}</span>}
       </div>
     </button>

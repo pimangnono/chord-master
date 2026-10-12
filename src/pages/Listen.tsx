@@ -27,6 +27,7 @@ const STYLES: { id: Style; label: string }[] = [
   { id: 'jazz', label: 'Jazz' },
   { id: 'bossa', label: 'Bossa Nova' },
   { id: 'hiphop', label: 'Hip-hop' },
+  { id: 'rnb', label: 'R&B' },
 ];
 
 let statsCache: ReturnType<typeof buildTransitionStats> | null = null;

@@ -2103,3 +2103,30 @@ textarea {
 .accent {
   color: var(--brand2);
 }
+
+/* ───────── genre subtypes ───────── */
+.subtype-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.subtype-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.subtype-card:hover {
+  border-color: var(--brand2);
+}
+
+.subtype p {
+  margin: 0;
+}

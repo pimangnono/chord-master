@@ -290,6 +290,7 @@ function Builder({ itemId }: { itemId: string }) {
                 <option value="jazz">Jazz</option>
                 <option value="bossa">Bossa Nova</option>
                 <option value="hiphop">Hip-hop</option>
+                <option value="rnb">R&amp;B</option>
               </select>
             </div>
             <div className="palette-row">

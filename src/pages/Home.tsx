@@ -4,7 +4,7 @@ import { STAGES } from '../game/stages';
 import { levelFromXp, useStore } from '../store';
 
 const FEATURES = [
-  { to: '/genres', icon: '🎼', title: '장르별 진행', body: 'Jazz · K-pop · Pop · Bossa Nova · Hip-hop의 대표 진행과 반주 리듬' },
+  { to: '/genres', icon: '🎼', title: '장르별 진행', body: 'Jazz · K-pop · Pop · Bossa Nova · Hip-hop · R&B(6가지 타입)의 대표 진행과 반주 리듬' },
   { to: '/eras', icon: '🕰️', title: '시대별 진행', body: '50년대 두왑부터 2020년대 로파이까지, 시대를 풍미한 진행' },
   { to: '/songs', icon: '🎵', title: '노래로 배우기', body: '곡을 고르면 코드 분석 + 3단계 반주법 + 악보' },
   { to: '/listen', icon: '🎙️', title: '실시간 코드 인식', body: '피아노 소리(마이크/MIDI)를 듣고 지금 코드와 다음 코드 추천' },

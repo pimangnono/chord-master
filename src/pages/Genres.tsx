@@ -9,9 +9,11 @@ export function GenresPage() {
   const [params, setParams] = useSearchParams();
   const nav = useNavigate();
   const genre = GENRE_BY_ID[(genreId as GenreId) ?? 'pop'] ?? GENRES[0];
-  const list = PROGRESSIONS.filter((p) => p.genres.includes(genre.id));
+  const subtype = genre.subtypes?.find((s) => s.id === params.get('s'));
+  const list = PROGRESSIONS.filter((p) => p.genres.includes(genre.id) && (!subtype || p.subtype === subtype.id));
   const selected = PROGRESSION_BY_ID[params.get('p') ?? ''] ?? list[0];
-  const songs = SONGS.filter((s) => s.genre === genre.id);
+  const songs = SONGS.filter((s) => s.genre === genre.id && (!subtype || s.subtype === subtype.id));
+  const setSub = (id?: string) => setParams(id ? { s: id } : {});
 
   return (
     <div className="page">
@@ -39,10 +41,47 @@ export function GenresPage() {
           ))}
         </ul>
       </section>
+      {genre.subtypes && (
+        <>
+          <div className="filters">
+            <button className={`chip-toggle${!subtype ? ' on' : ''}`} onClick={() => setSub()}>
+              전체 타입
+            </button>
+            {genre.subtypes.map((s) => (
+              <button key={s.id} className={`chip-toggle${subtype?.id === s.id ? ' on' : ''}`} onClick={() => setSub(s.id)}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+          {subtype ? (
+            <section className="card subtype">
+              <h3>
+                {subtype.name} <small className="muted">{subtype.years}</small>
+              </h3>
+              <p>{subtype.summary}</p>
+              <ul className="tips">
+                {subtype.traits.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <div className="subtype-grid">
+              {genre.subtypes.map((s) => (
+                <button key={s.id} className="subtype-card" onClick={() => setSub(s.id)}>
+                  <b>{s.name}</b>
+                  <span className="muted small">{s.years}</span>
+                  <span className="small">{s.summary}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
       <div className="split">
         <div className="list">
           {list.map((p) => (
-            <ProgressionCard key={p.id} p={p} active={p.id === selected?.id} onClick={() => setParams({ p: p.id })} />
+            <ProgressionCard key={p.id} p={p} active={p.id === selected?.id} onClick={() => setParams(subtype ? { s: subtype.id, p: p.id } : { p: p.id })} />
           ))}
           {songs.length > 0 && (
             <div className="card">

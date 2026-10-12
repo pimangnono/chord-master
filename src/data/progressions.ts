@@ -1,4 +1,12 @@
-export type GenreId = 'pop' | 'kpop' | 'jazz' | 'bossa' | 'hiphop';
+export type GenreId = 'pop' | 'kpop' | 'jazz' | 'bossa' | 'hiphop' | 'rnb';
+
+export interface Subtype {
+  id: string;
+  name: string;
+  years: string;
+  summary: string;
+  traits: string[];
+}
 
 export interface Genre {
   id: GenreId;
@@ -8,6 +16,8 @@ export interface Genre {
   summary: string;
   traits: string[];
   rhythms: string[];
+  /** stylistic sub-genres (e.g. R&B: soul, new jack swing, neo-soul…) */
+  subtypes?: Subtype[];
 }
 
 export const GENRES: Genre[] = [
@@ -55,6 +65,59 @@ export const GENRES: Genre[] = [
     summary: '짧은 코드 루프(1~4개)를 샘플처럼 반복. 로파이·네오소울은 9th·13th 텐션, 트랩은 어두운 단조.',
     traits: ['2~4코드 루프', '스윙된 16비트(로파이)', '단조 루프와 프리지안 색채(트랩)'],
     rhythms: ['lofi', 'boombap', 'trap', 'citypop'],
+  },
+  {
+    id: 'rnb',
+    name: 'R&B',
+    emoji: '🌙',
+    color: '#ff8787',
+    summary: '가스펠·블루스에 뿌리를 둔 리듬 앤 블루스. 소울 → 뉴잭스윙 → 90s 발라드 → 네오소울 → 얼터너티브 R&B로 진화하며, 7th·9th 확장 코드와 그루브가 핵심이에요.',
+    traits: ['m7·maj9·13th 확장 코드', '스윙 16비트·12/8 셔플 그루브', '가스펠식 베이스 워크업과 경과 화음'],
+    rhythms: ['motown', 'newjack', 'slowjam', 'neosoul', 'gospel'],
+    subtypes: [
+      {
+        id: 'soul',
+        name: '클래식 소울·모타운',
+        years: '1960–1970s',
+        summary: '교회 가스펠을 대중음악으로 옮긴 원조 R&B. 단순한 3화음·I–vi–ii–V에 강한 백비트와 노래하는 베이스.',
+        traits: ['I–IV 뱀프, I–vi–ii–V 턴어라운드', '2·4박 탬버린·스네어', '70년대 필리 소울은 maj7 코드로 세련되게'],
+      },
+      {
+        id: 'njs',
+        name: '뉴잭스윙',
+        years: '1987–1995',
+        summary: '힙합 드럼머신 비트 위에 R&B 보컬과 재즈 화성을 얹은 장르. 스윙된 16비트와 m9·7#9 코드가 특징.',
+        traits: ['스윙 16비트 + 강한 스네어', 'm9·7♯9 등 펑키한 텐션', '짧게 끊는 신스 코드 스탭'],
+      },
+      {
+        id: 'slowjam',
+        name: '90s R&B 발라드 (슬로우잼)',
+        years: '1990s',
+        summary: '12/8 셔플 느낌의 느린 R&B 발라드. maj9·m9 코드를 길게 깔고 sus4 → 7으로 해결하며 감정을 끌어올려요.',
+        traits: ['12/8 셋잇단 그루브', 'maj9·m9·7sus4', 'vi–ii–V–I 5도권 흐름'],
+      },
+      {
+        id: 'neosoul',
+        name: '네오소울',
+        years: '1995–',
+        summary: '70년대 소울 + 재즈 화성 + 힙합 그루브. 레이백 리듬, 확장 코드, 빌린 화음으로 몽환적인 색을 내요.',
+        traits: ['레이백(늦게 치기) 그루브', '9th·11th·13th 텐션', '다이아토닉 하행, iv 빌린 화음'],
+      },
+      {
+        id: 'gospel',
+        name: '가스펠 R&B',
+        years: '교회 음악 ~ 현재',
+        summary: '흑인 교회 피아노에서 나온 화성. 베이스 워크업, 경과 감7화음, IV–iv–I 아멘 종지가 R&B 전체의 뿌리예요.',
+        traits: ['I – I7/3 – IV – #iv°7 베이스 워크업', 'IV → iv → I 아멘(플라갈) 종지', '왼손 옥타브 + 셔플'],
+      },
+      {
+        id: 'alt',
+        name: '컨템포러리·얼터너티브 R&B',
+        years: '2010s–',
+        summary: '트랩 드럼과 신스 패드 위의 미니멀하고 어두운 R&B. 짧은 루프를 반복하며 공간감을 살려요.',
+        traits: ['하프타임 트랩 드럼 + 808', 'm9·maj7·6 코드의 몽환적 루프', '단조 루프와 넓은 리버브'],
+      },
+    ],
   },
 ];
 
@@ -136,6 +199,8 @@ export interface Progression {
   bpm: number;
   rhythm: string;
   genres: GenreId[];
+  /** sub-genre id within a genre that has subtypes (R&B) */
+  subtype?: string;
   era?: string;
   difficulty: 1 | 2 | 3;
   description: string;
@@ -454,7 +519,8 @@ export const PROGRESSIONS: Progression[] = [
     key: 'Db',
     bpm: 84,
     rhythm: 'lofi',
-    genres: ['hiphop'],
+    genres: ['hiphop', 'rnb'],
+    subtype: 'neosoul',
     era: '1990s',
     difficulty: 2,
     description: '다이아토닉 7화음이 한 계단씩 내려오는 네오소울·R&B 진행.',
@@ -497,6 +563,186 @@ export const PROGRESSIONS: Progression[] = [
     difficulty: 2,
     description: '단조 서브도미넌트와 bVI를 거쳐 화성단음계 V7로 긴장을 만드는 진행.',
     theory: ['bVI → V7: 반음 하행 + 이끈음', 'V7(장조 도미넌트)이 비장미를 더해요'],
+  },
+  // ───────── R&B ─────────
+  {
+    id: 'motown-turn',
+    name: '모타운 턴어라운드 (I–vi–ii–V)',
+    numerals: 'I vi | ii V | I vi | ii V',
+    key: 'C',
+    bpm: 112,
+    rhythm: 'motown',
+    genres: ['rnb'],
+    subtype: 'soul',
+    era: '1960s',
+    difficulty: 1,
+    description: '50년대 I–vi–IV–V에서 IV를 ii로 바꾼 진행. 베이스가 5도씩 내려가며 더 매끄럽게 순환해요.',
+    theory: ['ii는 IV의 대리화음 (두 음을 공유)', '베이스: 도–라–레–솔 → 5도 하행 연쇄', '한 마디에 두 코드 — 빠른 화성 리듬'],
+  },
+  {
+    id: 'soul-vamp',
+    name: '소울 I–IV 뱀프',
+    numerals: 'I | IV | I | IV',
+    key: 'C',
+    bpm: 104,
+    rhythm: 'motown',
+    genres: ['rnb'],
+    subtype: 'soul',
+    era: '1960s',
+    difficulty: 1,
+    description: '두 코드를 반복하며 보컬과 그루브에 집중하는 소울의 기본형. 가스펠의 “아멘” 움직임에서 왔어요.',
+    theory: ['I → IV → I: 플라갈(변격) 움직임의 반복', '코드가 단순할수록 리듬과 베이스 라인이 중요'],
+    examples: ['My Girl – The Temptations (벌스)'],
+  },
+  {
+    id: 'philly-soul',
+    name: '필리 소울 (Imaj7–iii7–IVmaj7–V7sus4)',
+    numerals: 'Imaj7 | iii7 | IVmaj7 | V7sus4 V7',
+    key: 'Eb',
+    bpm: 100,
+    rhythm: 'motown',
+    genres: ['rnb'],
+    subtype: 'soul',
+    era: '1970s',
+    difficulty: 2,
+    description: '70년대 필라델피아 소울처럼 maj7 코드로 부드럽고 화려하게. 마지막 sus4 → 7 해결이 포인트.',
+    theory: ['V7sus4: 3음 대신 4음 → 긴장을 늦췄다가 V7에서 해결', 'Imaj7 → iii7: 세 음을 공유하는 부드러운 이동'],
+  },
+  {
+    id: 'njs-minor',
+    name: '뉴잭스윙 마이너 9th 루프',
+    numerals: 'i9 | iv9 | bVI7 | V7#9',
+    key: 'Cm',
+    bpm: 108,
+    rhythm: 'newjack',
+    genres: ['rnb'],
+    subtype: 'njs',
+    era: '1990s',
+    difficulty: 3,
+    description: '단조 m9 코드와 도미넌트 텐션을 오가는 뉴잭스윙 스타일 루프.',
+    theory: ['m9: 마이너 7th + 9음 — 어둡지만 세련된 색', 'bVI7 → V7♯9: 반음 하행 도미넌트 체인 (bVI7은 V의 트라이톤 대리 계열)', 'V7♯9: 장3도와 단3도(♯9)가 함께 울리는 펑키한 코드'],
+  },
+  {
+    id: 'njs-turn',
+    name: '뉴잭 메이저 턴어라운드 (ii–V–iii–VI)',
+    numerals: 'ii7 V7 | iii7 VI7 | ii7 V7 | Imaj7',
+    key: 'F',
+    bpm: 104,
+    rhythm: 'newjack',
+    genres: ['rnb'],
+    subtype: 'njs',
+    era: '1990s',
+    difficulty: 2,
+    description: 'ii–V를 한 단계씩 옮겨 가며 빠르게 순환하는 밝은 뉴잭스윙 진행.',
+    theory: ['iii7 → VI7: VI7 = V7/ii, 다시 ii로 돌아가는 고리', '마디당 2코드의 빠른 화성 리듬이 그루브를 만들어요'],
+  },
+  {
+    id: 'slowjam-9',
+    name: '슬로우잼 (Imaj9–vi9–ii9–V7sus4)',
+    numerals: 'Imaj9 | vi9 | ii9 | V7sus4 V7',
+    key: 'Db',
+    bpm: 64,
+    rhythm: 'slowjam',
+    genres: ['rnb'],
+    subtype: 'slowjam',
+    era: '1990s',
+    difficulty: 2,
+    description: '90년대 R&B 발라드의 정석. 9th 코드를 길게 깔고 sus4에서 7으로 해결하며 다시 처음으로.',
+    theory: ['I–vi–ii–V: 5도권 순환', '9음이 모든 코드에 “반짝임”을 더해요', 'V7sus4 → V7: 4음(도) → 3음(시) 해결'],
+  },
+  {
+    id: 'rnb-ballad',
+    name: 'R&B 발라드 (vi9–ii9–V13–Imaj9)',
+    numerals: 'vi9 | ii9 | V13 | Imaj9',
+    key: 'Ab',
+    bpm: 68,
+    rhythm: 'slowjam',
+    genres: ['rnb'],
+    subtype: 'slowjam',
+    difficulty: 2,
+    description: '단조(vi)에서 시작해 장조 Imaj9에 도착하는 감성적인 R&B 발라드 진행.',
+    theory: ['vi → ii → V → I: 근음이 계속 5도 하행', 'V13: 도미넌트 위에 13음 — 소울풀한 긴장'],
+  },
+  {
+    id: 'neosoul-cycle',
+    name: '네오소울 5도권 (ii9–V13–iii7–VI7b9)',
+    numerals: 'ii9 | V13 | iii7 | VI7b9',
+    key: 'Eb',
+    bpm: 82,
+    rhythm: 'neosoul',
+    genres: ['rnb'],
+    subtype: 'neosoul',
+    era: '2000s',
+    difficulty: 3,
+    description: 'I로 해결하지 않고 iii7로 비켜 가며 계속 순환하는 네오소울 진행.',
+    theory: ['V13 → iii7: 기대한 I 대신 iii (I의 대리)', 'VI7♭9 = V7/ii — ♭9 텐션이 다시 ii9로 끌어당겨요'],
+  },
+  {
+    id: 'neosoul-borrowed',
+    name: '네오소울 빌린 화음 (Imaj9–iv9)',
+    numerals: 'Imaj9 | Imaj9 | iv9 | iv9',
+    key: 'F',
+    bpm: 76,
+    rhythm: 'neosoul',
+    genres: ['rnb'],
+    subtype: 'neosoul',
+    difficulty: 2,
+    description: '장조 토닉과 같은으뜸음조 단조의 iv9를 오가는 몽환적인 2코드 뱀프.',
+    theory: ['iv9는 단조에서 빌려온 화음 — 장조 안의 쓸쓸한 색', 'Imaj9 → iv9: Imaj9의 3음(라)이 iv9의 7음(라♭)으로 반음 내려가요'],
+  },
+  {
+    id: 'gospel-walkup',
+    name: '가스펠 베이스 워크업',
+    numerals: 'I | I7/3 | IV | #iv°7 | I/5 | VI7 | ii7 | V7',
+    key: 'C',
+    bpm: 76,
+    rhythm: 'gospel',
+    genres: ['rnb'],
+    subtype: 'gospel',
+    difficulty: 3,
+    description: '베이스가 도–미–파–파♯–솔로 걸어 올라가는 교회 피아노의 대표 진행. R&B 발라드 곳곳에 녹아 있어요.',
+    theory: ['I7/3 = V7/IV를 1전위로 — 베이스 미가 파로 반음 상행', '#iv°7: 파♯ 경과 감7화음 → I/5(솔)로 반음 상행', 'VI7–ii7–V7: 턴어라운드로 다시 처음으로'],
+  },
+  {
+    id: 'gospel-amen',
+    name: '가스펠 아멘 종지 (IV–iv–I)',
+    numerals: 'IVmaj7 | iv6 | I/5 VI7 | ii7 V7',
+    key: 'Bb',
+    bpm: 72,
+    rhythm: 'gospel',
+    genres: ['rnb'],
+    subtype: 'gospel',
+    difficulty: 2,
+    description: 'IV에서 단조 iv로 바꾼 뒤 I로 내려앉는 “아멘” 종지. 감동적인 R&B 엔딩의 단골.',
+    theory: ['IV → iv: 3음이 반음 하강 (B♭장조: 솔 → 솔♭)', 'iv6 → I: 마이너 플라갈 종지', 'I/5: 베이스 5음 위의 토닉 — 다음 VI7로 이어지는 다리'],
+  },
+  {
+    id: 'alt-rnb',
+    name: '얼터너티브 R&B 루프 (vi9–IVmaj7–Imaj7–V6)',
+    numerals: 'vi9 | IVmaj7 | Imaj7 | V6',
+    key: 'C',
+    bpm: 70,
+    rhythm: 'trap',
+    genres: ['rnb'],
+    subtype: 'alt',
+    era: '2010s',
+    difficulty: 2,
+    description: '감성 팝 진행(vi–IV–I–V)에 확장 코드를 입혀 트랩 비트 위에서 몽환적으로.',
+    theory: ['vi–IV–I–V 뼈대에 9th·maj7·6 색채', 'V6: 도미넌트지만 7음 대신 6음 → 해결 욕구가 약해 루프에 어울려요'],
+  },
+  {
+    id: 'alt-dark',
+    name: '다크 R&B 마이너 루프',
+    numerals: 'i9 | bVImaj7 | bIIImaj7 | bVII',
+    key: 'Fm',
+    bpm: 72,
+    rhythm: 'trap',
+    genres: ['rnb'],
+    subtype: 'alt',
+    era: '2010s',
+    difficulty: 2,
+    description: '단조 에픽 루프를 m9·maj7로 부드럽게 바꾼 어두운 컨템포러리 R&B 사운드.',
+    theory: ['i–bVI–bIII–bVII: 자연단음계 루프', 'maj7 코드가 어둠 속에 따뜻함을 더해요'],
   },
   // ───────── ERA-ONLY ─────────
   {

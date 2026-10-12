@@ -12,6 +12,8 @@ export interface Song {
   artist: string;
   year?: number;
   genre: GenreId;
+  /** sub-genre id (see Genre.subtypes) */
+  subtype?: string;
   era?: string;
   key: string;
   bpm: number;
@@ -64,7 +66,8 @@ export const SONGS: Song[] = [
     title: 'Stand by Me',
     artist: 'Ben E. King',
     year: 1961,
-    genre: 'pop',
+    genre: 'rnb',
+    subtype: 'soul',
     era: '1960s',
     key: 'A',
     bpm: 118,
@@ -280,7 +283,8 @@ export const SONGS: Song[] = [
     title: 'Just the Two of Us',
     artist: 'Grover Washington Jr. ft. Bill Withers',
     year: 1980,
-    genre: 'hiphop',
+    genre: 'rnb',
+    subtype: 'soul',
     era: '1980s',
     key: 'Fm',
     bpm: 96,
@@ -290,7 +294,76 @@ export const SONGS: Song[] = [
     about: '같은 이름의 진행을 탄생시킨 R&B 명곡. 힙합 샘플·커버, 시티팝, 최근 K-pop까지 영향을 줬어요.',
     tips: ['Dbmaj7 → C7: 베이스 반음 하행', 'C7 → Fm7: 단조 V7 → i', 'Ebm7 → Ab7 → Dbmaj7: D♭으로 가는 ii–V'],
   },
+  {
+    id: 'my-girl',
+    title: 'My Girl',
+    artist: 'The Temptations',
+    year: 1964,
+    genre: 'rnb',
+    subtype: 'soul',
+    era: '1960s',
+    key: 'C',
+    bpm: 104,
+    rhythm: 'motown',
+    difficulty: 1,
+    sections: [{ name: '벌스', chords: 'C | F | C | F' }],
+    about: '모타운 소울의 대표곡. 벌스는 I–IV 두 코드만 반복하고, 베이스와 리듬이 곡을 이끌어요. (벌스만 수록)',
+    tips: ['C ↔ F: 공통음 도를 잡은 채 나머지만 움직이기 (자리바꿈 가이드 참고)', '2·4박 백비트를 몸으로 느끼며'],
+  },
+  {
+    id: 'aint-no-sunshine',
+    title: "Ain't No Sunshine",
+    artist: 'Bill Withers',
+    year: 1971,
+    genre: 'rnb',
+    subtype: 'soul',
+    era: '1970s',
+    key: 'Am',
+    bpm: 78,
+    rhythm: 'slowjam',
+    difficulty: 1,
+    sections: [{ name: '벌스', chords: 'Am Em | G Am | Am Em | G Am' }],
+    about: '단조 i–v–bVII–i 를 반복하는 소울 명곡. 장조 V 대신 단조 v(Em)를 써서 블루지하고 쓸쓸해요. (간략화된 코드)',
+    tips: ['Em(v): 자연단음계의 단조 도미넌트', 'G(bVII) → Am: 에올리안 종지'],
+  },
   // ── 오리지널 연습곡 ──
+  {
+    id: 'velvet-midnight',
+    title: 'Velvet Midnight',
+    artist: 'Chord Master 오리지널',
+    genre: 'rnb',
+    subtype: 'slowjam',
+    key: 'Db',
+    bpm: 64,
+    rhythm: 'slowjam',
+    difficulty: 2,
+    original: true,
+    sections: [
+      { name: '벌스', chords: 'Dbmaj9 | Bbm9 | Ebm9 | Ab7sus4 Ab7' },
+      { name: '후렴', chords: 'Gbmaj7 | Fm7 | Ebm9 | Ab13' },
+    ],
+    about: '90년대 R&B 슬로우잼 연습곡. 벌스는 I–vi–ii–V, 후렴은 IV–iii–ii–V 하행.',
+    tips: ['12/8 셋잇단 그루브로', 'sus4 → 7: 왼손은 그대로, 오른손 4음만 3음으로 반음 내리기'],
+  },
+  {
+    id: 'sunday-light',
+    title: 'Sunday Light',
+    artist: 'Chord Master 오리지널',
+    genre: 'rnb',
+    subtype: 'gospel',
+    key: 'Ab',
+    bpm: 74,
+    rhythm: 'gospel',
+    difficulty: 3,
+    original: true,
+    sections: [
+      { name: '워크업', chords: 'Ab | Ab7/C | Db | Ddim7 | Ab/Eb | F7 | Bbm7 | Eb7' },
+      { name: '엔딩', chords: 'Dbmaj7 | Dbm6 | Ab/Eb F7 | Bbm7 Eb7' },
+    ],
+    about: '가스펠 R&B 연습곡. 베이스 워크업(라♭–도–레♭–레–미♭)과 IV–iv–I 아멘 종지를 익혀요.',
+    tips: ['Ab7/C: 베이스 도 → 레♭(Db)으로 반음 상행', 'Ddim7: 경과 감7화음 → Ab/Eb로 반음 상행', 'Dbm6: 장조 IV를 단조로 — 아멘 종지'],
+  },
+  // ── 오리지널 연습곡 (기타 장르) ──
   {
     id: 'spring-confession',
     title: '봄날의 고백',

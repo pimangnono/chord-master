@@ -56,6 +56,7 @@ export function SongsPage() {
               <span className="tag" style={{ '--accent': GENRE_BY_ID[s.genre].color } as React.CSSProperties}>
                 {GENRE_BY_ID[s.genre].name}
               </span>
+              {s.subtype && <span className="tag plain">{GENRE_BY_ID[s.genre].subtypes?.find((x) => x.id === s.subtype)?.name}</span>}
               {s.original && <span className="tag plain">오리지널 연습곡</span>}
               {s.custom && <span className="tag plain">내가 추가</span>}
             </div>

@@ -3,7 +3,7 @@ import { parseKey } from './keys';
 import { splitSlash } from './notes';
 import { ChordEvent, chordToRoman, romanToChord } from './roman';
 
-export type Style = 'pop' | 'kpop' | 'jazz' | 'bossa' | 'hiphop';
+export type Style = 'pop' | 'kpop' | 'jazz' | 'bossa' | 'hiphop' | 'rnb';
 
 export interface Suggestion {
   symbol: string;
@@ -184,7 +184,7 @@ export function suggestNext(current: string, key: string, opts: { style?: Style;
   const { minor } = parseKey(key);
   const tok = chordToken(current, key);
   if (!tok) return [];
-  const sevenths = opts.style === 'jazz' || opts.style === 'bossa' || opts.style === 'hiphop';
+  const sevenths = opts.style === 'jazz' || opts.style === 'bossa' || opts.style === 'hiphop' || opts.style === 'rnb';
   const merged = new Map<string, Suggestion>();
   const add = (numeral: string, weight: number, reason: string) => {
     let n = numeral;
