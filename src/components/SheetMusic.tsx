@@ -19,7 +19,7 @@ import { buildScore, ScoreItem, splitDuration, vexKey } from '../notation/score'
 import { buildArrangement } from '../theory/arrange';
 import { prettyChord, prettyNote, solfege } from '../theory/notes';
 import type { ChordEvent } from '../theory/roman';
-import { noteRole } from '../theory/voicing';
+import { noteRole, VoicingMode } from '../theory/voicing';
 import { movableDo, parseKey, shortKeyLabel } from '../theory/keys';
 
 interface Hit {
@@ -50,6 +50,7 @@ export interface SheetMusicProps {
   rhythm: RhythmPattern;
   keySig: string;
   activeBeat?: number;
+  voicing?: VoicingMode;
   onChordClick?: (index: number) => void;
 }
 
@@ -57,7 +58,7 @@ const LINE_H = 250;
 const TREBLE_Y = 30;
 const BASS_Y = 125;
 
-export function SheetMusic({ chords, rhythm, keySig, activeBeat, onChordClick }: SheetMusicProps) {
+export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', onChordClick }: SheetMusicProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -76,9 +77,9 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, onChordClick }:
   }, []);
 
   const score = useMemo(() => {
-    const arr = buildArrangement(chords, rhythm);
+    const arr = buildArrangement(chords, rhythm, voicing);
     return { bars: buildScore(arr, chords), arr };
-  }, [chords, rhythm]);
+  }, [chords, rhythm, voicing]);
 
   useEffect(() => {
     const el = host.current;

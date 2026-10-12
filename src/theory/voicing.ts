@@ -68,9 +68,12 @@ export function rightHandPitchClasses(info: ChordInfo): string[] {
   return ranked.map((r) => r.n);
 }
 
-function candidates(pcs: string[]): number[][] {
+/** smooth = pick the inversion closest to the previous chord; root = always root position */
+export type VoicingMode = 'smooth' | 'root';
+
+function candidates(pcs: string[], rootOnly = false): number[][] {
   const out: number[][] = [];
-  for (let r = 0; r < pcs.length; r++) {
+  for (let r = 0; r < (rootOnly ? 1 : pcs.length); r++) {
     const order = [...pcs.slice(r), ...pcs.slice(0, r)];
     for (let start = RH_LOW; start < RH_LOW + 12; start++) {
       if (chroma(order[0]) !== start % 12) continue;
@@ -84,7 +87,13 @@ function candidates(pcs: string[]): number[][] {
   return out;
 }
 
+/** Finger travel between two voicings: sorted voice-by-voice when sizes match (optimal in 1-D). */
 function distance(a: number[], b: number[]): number {
+  if (a.length === b.length) {
+    const x = [...a].sort((p, q) => p - q);
+    const y = [...b].sort((p, q) => p - q);
+    return x.reduce((sum, v, i) => sum + Math.abs(v - y[i]), 0) * 2;
+  }
   let d = 0;
   for (const x of a) d += Math.min(...b.map((y) => Math.abs(x - y)));
   for (const y of b) d += Math.min(...a.map((x) => Math.abs(x - y)));
@@ -99,14 +108,14 @@ export interface Voicing {
 }
 
 /** Close-position right hand with smooth voice-leading from `prev`, bass in the left hand. */
-export function voiceChord(symbol: string, prev?: string[]): Voicing {
+export function voiceChord(symbol: string, prev?: string[], mode: VoicingMode = 'smooth'): Voicing {
   const info = chordInfo(symbol);
   if (info.empty) return { symbol, rh: [], bass: 'C3', info };
   const pcs = rightHandPitchClasses(info);
-  const prevMidi = prev?.map((n) => Note.midi(n) ?? 60);
+  const prevMidi = mode === 'smooth' ? prev?.map((n) => Note.midi(n) ?? 60) : undefined;
   let best: number[] = [];
   let bestScore = Infinity;
-  for (const c of candidates(pcs)) {
+  for (const c of candidates(pcs, mode === 'root')) {
     const avg = c.reduce((a, b) => a + b, 0) / c.length;
     const score = prevMidi?.length ? distance(c, prevMidi) + Math.abs(avg - RH_CENTER) * 0.35 : Math.abs(avg - RH_CENTER);
     if (score < bestScore) {
@@ -121,11 +130,11 @@ export function voiceChord(symbol: string, prev?: string[]): Voicing {
 }
 
 /** Voices a whole progression with voice-leading between chords. */
-export function voiceProgression(symbols: string[]): Voicing[] {
+export function voiceProgression(symbols: string[], mode: VoicingMode = 'smooth'): Voicing[] {
   const out: Voicing[] = [];
   let prev: string[] | undefined;
   for (const s of symbols) {
-    const v = voiceChord(s, prev);
+    const v = voiceChord(s, prev, mode);
     out.push(v);
     if (v.rh.length) prev = v.rh;
   }

@@ -3,6 +3,7 @@ import * as Tone from 'tone';
 import type { DrumHit, DrumInst, RhythmPattern } from '../data/rhythms';
 import { buildArrangement, swingTime } from '../theory/arrange';
 import type { ChordEvent } from '../theory/roman';
+import type { VoicingMode } from '../theory/voicing';
 
 export type AudioStatus = 'idle' | 'loading' | 'ready' | 'fallback';
 
@@ -155,6 +156,7 @@ export interface PlayOptions {
   drums?: boolean;
   muteLH?: boolean;
   muteRH?: boolean;
+  voicing?: VoicingMode;
   onChord?: (index: number) => void;
   onBeat?: (beat: number) => void;
   onEnd?: () => void;
@@ -177,7 +179,7 @@ class Player {
     transport.position = 0;
     const ppq = transport.PPQ;
     const ticks = (beats: number) => `${Math.round(beats * ppq)}i`;
-    const arr = buildArrangement(opts.chords, opts.rhythm);
+    const arr = buildArrangement(opts.chords, opts.rhythm, opts.voicing);
     if (!arr.total) return;
 
     const notes = arr.events

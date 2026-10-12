@@ -2,7 +2,7 @@ import { Note } from 'tonal';
 import type { DrumHit, Part, RhythmPattern } from '../data/rhythms';
 import { midiToNote } from './notes';
 import type { ChordEvent } from './roman';
-import { fifthAbove, octaveAbove, shellVoicing, voiceProgression, Voicing } from './voicing';
+import { fifthAbove, octaveAbove, shellVoicing, voiceProgression, Voicing, VoicingMode } from './voicing';
 
 export interface NoteEvent {
   t: number;
@@ -66,8 +66,8 @@ function partNotes(part: Part, v: Voicing, next: Voicing, beat: number, beats: n
 }
 
 /** Expands a progression + rhythm pattern into concrete note events (in beats). */
-export function buildArrangement(chords: ChordEvent[], rhythm: RhythmPattern): Arrangement {
-  const voicings = voiceProgression(chords.map((c) => c.symbol));
+export function buildArrangement(chords: ChordEvent[], rhythm: RhythmPattern, mode: VoicingMode = 'smooth'): Arrangement {
+  const voicings = voiceProgression(chords.map((c) => c.symbol), mode);
   const starts: number[] = [];
   let total = 0;
   for (const c of chords) {

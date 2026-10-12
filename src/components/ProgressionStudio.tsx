@@ -8,7 +8,9 @@ import { getRhythm, RHYTHMS } from '../data/rhythms';
 import { intervalBetweenKeys, keyLabel, keyOptionsFor, keyUsesFlats, parseKey, transposeChord } from '../theory/keys';
 import { prettyChord } from '../theory/notes';
 import { ChordEvent, chordToRoman, secondaryLabel } from '../theory/roman';
-import { noteRole, voiceProgression } from '../theory/voicing';
+import { BassSuggestion, bassSuggestions } from '../theory/inversion';
+import { noteRole, voiceProgression, VoicingMode } from '../theory/voicing';
+import { InversionGuide } from './InversionGuide';
 import { useStore } from '../store';
 import { Piano } from './Piano';
 import { RhythmGrid } from './RhythmGrid';
@@ -52,6 +54,9 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
   const [muteLH, setMuteLH] = useState(false);
   const [muteRH, setMuteRH] = useState(false);
   const [view, setView] = useState<'accomp' | 'voicing'>('accomp');
+  const [voicingMode, setVoicingMode] = useState<VoicingMode>('smooth');
+  /** chord index → slash-chord replacement from the inversion guide */
+  const [slashes, setSlashes] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveName, setSaveName] = useState(title);
@@ -71,30 +76,49 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
 
   const rhythm = getRhythm(rhythmId);
   const ivl = intervalBetweenKeys(baseKey, key);
-  const keyed = useMemo(() => chords.map((c) => ({ ...c, symbol: transposeChord(c.symbol, ivl) })), [chords, ivl]);
-  const voicings = useMemo(() => voiceProgression(keyed.map((c) => c.symbol)), [keyed]);
+  const keyedBase = useMemo(() => chords.map((c) => ({ ...c, symbol: transposeChord(c.symbol, ivl) })), [chords, ivl]);
+  useEffect(() => setSlashes({}), [keyedBase]);
+  const keyed = useMemo(() => keyedBase.map((c, i) => (slashes[i] ? { ...c, symbol: slashes[i] } : c)), [keyedBase, slashes]);
+  const bassSugg = useMemo(() => bassSuggestions(keyedBase.map((c) => c.symbol)), [keyedBase]);
+  const voicings = useMemo(() => voiceProgression(keyed.map((c) => c.symbol), voicingMode), [keyed, voicingMode]);
   const flats = keyUsesFlats(key);
   const current = isPlaying && playback.chord >= 0 ? playback.chord : selected;
   const v = voicings[current];
 
-  const restart = (patch: Partial<{ key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean }>) => {
+  type Settings = { key: string; rhythm: string; loop: boolean; drums: boolean; muteLH: boolean; muteRH: boolean; voicing: VoicingMode; slashes: Record<number, string> };
+  const restart = (patch: Partial<Settings>) => {
     if (!isPlaying) return;
-    const next = { key, rhythm: rhythmId, loop, drums, muteLH, muteRH, ...patch };
+    const next: Settings = { key, rhythm: rhythmId, loop, drums, muteLH, muteRH, voicing: voicingMode, slashes, ...patch };
     const iv = intervalBetweenKeys(baseKey, next.key);
     startPlayback(owner, {
-      chords: chords.map((c) => ({ ...c, symbol: transposeChord(c.symbol, iv) })),
+      chords: chords.map((c, i) => ({ ...c, symbol: next.slashes[i] ?? transposeChord(c.symbol, iv) })),
       rhythm: getRhythm(next.rhythm),
       bpm,
       loop: next.loop,
       drums: next.drums,
       muteLH: next.muteLH,
       muteRH: next.muteRH,
+      voicing: next.voicing,
     });
   };
 
   const toggle = () => {
     if (isPlaying) stopPlayback();
-    else startPlayback(owner, { chords: keyed, rhythm, bpm, loop, drums, muteLH, muteRH });
+    else startPlayback(owner, { chords: keyed, rhythm, bpm, loop, drums, muteLH, muteRH, voicing: voicingMode });
+  };
+
+  const changeVoicing = (m: VoicingMode) => {
+    setVoicingMode(m);
+    restart({ voicing: m });
+  };
+
+  const toggleSlash = (sg: BassSuggestion) => {
+    const next = { ...slashes };
+    if (next[sg.index] === sg.symbol) delete next[sg.index];
+    else next[sg.index] = sg.symbol;
+    setSlashes(next);
+    setSelected(sg.index);
+    restart({ slashes: next });
   };
 
   const changeRhythm = (id: string) => {
@@ -142,7 +166,7 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
             value={key}
             onChange={(e) => {
               setKey(e.target.value);
-              restart({ key: e.target.value });
+              restart({ key: e.target.value, slashes: {} });
             }}
           >
             {keyOptionsFor(parseKey(baseKey).minor).map((k) => (
@@ -237,6 +261,7 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
           chords={keyed}
           rhythm={view === 'accomp' ? rhythm : getRhythm('whole')}
           keySig={key}
+          voicing={voicingMode}
           activeBeat={isPlaying ? playback.beat : undefined}
           onChordClick={(i) => {
             setSelected(i);
@@ -256,6 +281,16 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
           </ul>
         </div>
       </section>
+      <InversionGuide
+        chords={keyed}
+        keyName={key}
+        mode={voicingMode}
+        onModeChange={changeVoicing}
+        suggestions={bassSugg}
+        applied={slashes}
+        onToggleSlash={toggleSlash}
+        onSelect={setSelected}
+      />
     </div>
   );
 }
