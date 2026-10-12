@@ -22,6 +22,10 @@
 
 계이름은 **고정도(C=도)와 이동도(조의 으뜸음=도, 단조는 라 시작)를 함께** 보여주며, 사이드바에서 하나만 보이게 바꿀 수 있어요.
 
+## 사이트
+
+`.github/workflows/pages.yml`이 푸시할 때마다 테스트 → 빌드 → GitHub Pages 배포를 합니다 (저장소 Settings → Pages → Source를 **GitHub Actions**로 한 번 설정). 주소: https://pimangnono.github.io/chord-master/ — HTTPS라 마이크·MIDI 모두 동작합니다.
+
 ## 실행
 
 ```bash
