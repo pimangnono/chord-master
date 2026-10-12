@@ -12,6 +12,7 @@ import { LibraryPage } from './pages/Library';
 import { ListenPage } from './pages/Listen';
 import { SongPage, SongsPage } from './pages/Songs';
 import { AboutPage } from './pages/About';
+import { DrillPage } from './pages/Drill';
 
 const NAV = [
   { to: '/', label: '홈', icon: '🏠', end: true },
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/eras', label: '시대별 진행', icon: '🕰️' },
   { to: '/songs', label: '노래로 배우기', icon: '🎵' },
   { to: '/listen', label: '실시간 코드 인식', icon: '🎙️' },
+  { to: '/drill', label: '코드 복습', icon: '🔁' },
   { to: '/game', label: '화성학 게임', icon: '🎮' },
   { to: '/library', label: '내 라이브러리', icon: '♥' },
 ];
@@ -126,6 +128,7 @@ export default function App() {
             <Route path="/songs" element={<SongsPage />} />
             <Route path="/songs/:songId" element={<SongPage />} />
             <Route path="/listen" element={<ListenPage />} />
+            <Route path="/drill" element={<DrillPage />} />
             <Route path="/game" element={<GamePage />} />
             <Route path="/game/:stageId" element={<GamePage />} />
             <Route path="/library" element={<LibraryPage />} />

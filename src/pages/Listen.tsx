@@ -4,14 +4,13 @@ import { noteOff, noteOn, playNotes } from '../audio/engine';
 import { listAudioInputs, MicListener } from '../audio/listener';
 import { connectMidiHub, setMidiSound, useMidi } from '../audio/midiHub';
 import { Piano } from '../components/Piano';
-import { PROGRESSIONS } from '../data/progressions';
-import { SONGS } from '../data/songs';
 import { detectFromChroma, detectFromMidi, ChordGuess } from '../theory/detect';
 import { estimateKeyFromChords } from '../theory/key';
 import { keyLabel, keyUsesFlats, MAJOR_KEYS, MINOR_KEYS, movableDo } from '../theory/keys';
 import { midiToNote, prettyChord, solfege } from '../theory/notes';
-import { chordToRoman, parseBars, progressionToChords, secondaryLabel } from '../theory/roman';
-import { buildTransitionStats, Style, suggestNext } from '../theory/suggest';
+import { chordToRoman, secondaryLabel } from '../theory/roman';
+import { Style, suggestNext } from '../theory/suggest';
+import { corpusStats } from '../data/corpus';
 import { voiceChord } from '../theory/voicing';
 import { useStore } from '../store';
 import { IS_ARTIFACT } from '../platform';
@@ -30,17 +29,6 @@ const STYLES: { id: Style; label: string }[] = [
   { id: 'hiphop', label: 'Hip-hop' },
   { id: 'rnb', label: 'R&B' },
 ];
-
-let statsCache: ReturnType<typeof buildTransitionStats> | null = null;
-function corpusStats() {
-  if (!statsCache) {
-    statsCache = buildTransitionStats([
-      ...PROGRESSIONS.map((p) => ({ key: p.key, chords: progressionToChords(p.numerals, p.key) })),
-      ...SONGS.flatMap((s) => s.sections.map((sec) => ({ key: s.key, chords: parseBars(sec.chords) }))),
-    ]);
-  }
-  return statsCache;
-}
 
 export function ListenPage() {
   const [source, setSource] = useState<Source>('keys');

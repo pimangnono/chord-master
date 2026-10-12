@@ -8,7 +8,8 @@ const FEATURES = [
   { to: '/eras', icon: '🕰️', title: '시대별 진행', body: '50년대 두왑부터 2020년대 로파이까지, 시대를 풍미한 진행' },
   { to: '/songs', icon: '🎵', title: '노래로 배우기', body: '곡을 고르면 코드 분석 + 3단계 반주법 + 악보' },
   { to: '/listen', icon: '🎙️', title: '실시간 코드 인식', body: '피아노 소리(마이크/MIDI)를 듣고 지금 코드와 다음 코드 추천' },
-  { to: '/game', icon: '🎮', title: '화성학 게임', body: '계이름부터 7th 코드, 종지까지 스테이지 클리어' },
+  { to: '/drill', icon: '🔁', title: '코드 복습', body: '화성학 규칙으로 이어지는 코드를 피아노로 치며 진행·자리바꿈 연습' },
+  { to: '/game', icon: '🎮', title: '화성학 게임', body: '코드 진행 문제를 직접 피아노로 쳐서 풀기 + 기초 화성학' },
   { to: '/library', icon: '♥', title: '내 라이브러리', body: '마음에 든 진행 저장 · 직접 만들기 · 백업' },
 ];
 

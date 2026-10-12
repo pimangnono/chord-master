@@ -114,3 +114,46 @@ export function bassSuggestions(symbols: string[]): BassSuggestion[] {
   }
   return out;
 }
+
+export interface InversionTarget {
+  number: number;
+  name: string;
+  /** pitch class name that must be the lowest note */
+  bass: string;
+  /** e.g. "3음(미)" — set by the caller with solfege */
+  role: string;
+}
+
+const INV_NAMES = ['기본형', '1전위', '2전위', '3전위'];
+
+function roleName(ivl: string): string {
+  if (ivl === '1P') return '근음';
+  if (ivl === '4P') return '4음(sus)';
+  if (ivl === '2M') return '2음(sus)';
+  if (ivl.startsWith('3')) return '3음';
+  if (ivl.startsWith('5')) return '5음';
+  if (ivl.startsWith('6')) return '6음';
+  if (ivl.startsWith('7')) return '7음';
+  return ivl;
+}
+
+/** The inversions a chord can be played in: root, 3rd, 5th and (for sevenths) 7th in the bass. */
+export function inversionChoices(symbol: string): InversionTarget[] {
+  const info = chordInfo(splitSlash(symbol)[0]);
+  if (info.empty) return [];
+  const out: InversionTarget[] = [];
+  info.notes.slice(0, 4).forEach((pc, i) => {
+    const ivl = info.intervals[i] ?? '';
+    // only chord tones that make a real inversion (skip 9ths/6ths standing in a later slot)
+    if (i === 3 && !ivl.startsWith('7')) return;
+    out.push({ number: i, name: INV_NAMES[i], bass: pc, role: roleName(ivl) });
+  });
+  return out;
+}
+
+/** Which inversion was played, judged by the lowest note (-1 if it is not a chord tone). */
+export function playedInversion(notes: number[], symbol: string): number {
+  if (!notes.length) return -1;
+  const low = Math.min(...notes) % 12;
+  return inversionChoices(symbol).find((c) => chroma(c.bass) === low)?.number ?? -1;
+}
