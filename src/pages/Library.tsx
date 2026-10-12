@@ -10,6 +10,8 @@ import { ChordEvent, chordToRoman, colorChords, diatonicChords } from '../theory
 import { Style, suggestNext } from '../theory/suggest';
 import { voiceChord } from '../theory/voicing';
 import { SavedProgression, useStore } from '../store';
+import { ConfirmButton } from '../components/ConfirmButton';
+import { saveTextFile } from '../platform';
 
 export function LibraryPage() {
   const { itemId } = useParams();
@@ -24,13 +26,9 @@ function LibraryList() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const exportAll = () => {
-    const blob = new Blob([JSON.stringify(saved, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `chord-master-library-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  const exportAll = async () => {
+    const ok = await saveTextFile(`chord-master-library-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(saved, null, 2));
+    if (!ok) setMsg('내보내기를 취소했거나 이 화면에서는 파일 저장을 쓸 수 없어요.');
   };
 
   const importFile = async (f: File) => {
@@ -48,7 +46,7 @@ function LibraryList() {
       <header className="page-head row">
         <div>
           <h1>내 라이브러리</h1>
-          <p className="muted">마음에 드는 진행을 저장하고, 직접 만들고, 파일로 백업할 수 있어요. (이 브라우저에 저장됩니다)</p>
+          <p className="muted">마음에 드는 진행을 저장하고, 직접 만들고, 파일로 백업할 수 있어요.</p>
         </div>
         <div className="row gap">
           <Link to="/library/new" className="btn">
@@ -98,9 +96,7 @@ function LibraryList() {
                 <Link to={`/library/${p.id}`} className="btn ghost small">
                   연습·편집
                 </Link>
-                <button className="btn ghost small danger" onClick={() => confirm(`“${p.name}”을(를) 삭제할까요?`) && del(p.id)}>
-                  삭제
-                </button>
+                <ConfirmButton label="삭제" onConfirm={() => del(p.id)} />
               </div>
             </div>
           </div>

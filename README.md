@@ -31,12 +31,14 @@ npm run build    # dist/ 에 정적 사이트 생성 (어느 정적 호스팅에
 npm test         # 이론·인식 엔진 단위 테스트
 ```
 
-마이크 사용에는 `localhost` 또는 HTTPS가 필요합니다. 피아노 샘플은 첫 재생 때 인터넷에서 불러오며, 오프라인이면 신디사이저 소리로 대체됩니다.
+마이크 사용에는 `localhost` 또는 HTTPS가 필요합니다. 피아노 샘플은 앱에 내장돼 있어 오프라인에서도 동작합니다.
+
+`npm run build:artifact`는 claude.ai 아티팩트용 빌드(`dist-artifact/`)를 만듭니다. 아티팩트에서는 플랫폼 정책상 마이크·MIDI를 쓸 수 없어 화면/키보드 입력만 지원하고, 저장 데이터는 claude.ai 계정(db capability)에 동기화됩니다.
 
 ## 오픈소스
 
 - [Tone.js](https://github.com/Tonejs/Tone.js) (MIT) — 오디오 재생/스케줄링
-- [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) (CC-BY 3.0, Alexander Holm) — 피아노 샘플
+- [tonejs-instruments](https://github.com/Makefully-Studios/tonejs-instruments) piano mp3 (MIT, npm `tonejs-instrument-piano-mp3`) — 피아노 샘플, `public/samples`에 내장
 - [Tonal](https://github.com/tonaljs/tonal) (MIT) — 음악 이론 계산
 - [VexFlow](https://github.com/0xfe/vexflow) (MIT) — 악보 렌더링
 - React, React Router, Zustand, Vite (MIT)

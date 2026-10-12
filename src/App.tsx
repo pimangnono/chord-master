@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
-import { HashRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { HashRouter, MemoryRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { stopPlayback, useAudioStatus } from './audio/playback';
+import { getSyncState, IS_ARTIFACT, onSyncState, SyncState } from './platform';
 import { levelFromXp, useStore } from './store';
 import { ErasPage } from './pages/Eras';
 import { GamePage } from './pages/Game';
@@ -28,6 +29,17 @@ function StopOnNavigate() {
     window.scrollTo(0, 0);
   }, [loc.pathname]);
   return null;
+}
+
+// Artifact links only pass a bare #anchor, so in-app routes live in memory there.
+const Router = IS_ARTIFACT ? MemoryRouter : HashRouter;
+
+function SyncBadge() {
+  const [s, setS] = useState<SyncState>(getSyncState());
+  useEffect(() => onSyncState(setS), []);
+  if (!IS_ARTIFACT) return null;
+  const text = { local: '저장: 이 브라우저', connecting: '계정에 연결 중…', synced: '저장: claude.ai 계정', error: '계정 저장 실패 (이 브라우저에만 저장)' }[s];
+  return <div className={`audio-dot sync-${s}`}>{text}</div>;
 }
 
 function Sidebar() {
@@ -81,6 +93,7 @@ function Sidebar() {
           {audio === 'ready' && '그랜드 피아노 준비됨'}
           {audio === 'fallback' && '신디사이저 모드'}
         </div>
+        <SyncBadge />
         <NavLink to="/about" className="nav-item small">
           오픈소스 & 정보
         </NavLink>
@@ -91,7 +104,7 @@ function Sidebar() {
 
 export default function App() {
   return (
-    <HashRouter>
+    <Router>
       <StopOnNavigate />
       <div className="app">
         <Sidebar />
@@ -114,6 +127,6 @@ export default function App() {
           </Routes>
         </main>
       </div>
-    </HashRouter>
+    </Router>
   );
 }

@@ -1,6 +1,6 @@
 const LIBS = [
   ['Tone.js', 'MIT', '웹 오디오 재생·스케줄링·신디사이저', 'https://github.com/Tonejs/Tone.js'],
-  ['Salamander Grand Piano', 'CC-BY 3.0 (Alexander Holm)', '그랜드 피아노 샘플', 'https://archive.org/details/SalamanderGrandPianoV3'],
+  ['tonejs-instruments (piano mp3)', 'MIT', '피아노 샘플 (앱에 내장)', 'https://github.com/Makefully-Studios/tonejs-instruments'],
   ['Tonal', 'MIT', '음·코드·음정·조성 이론 계산', 'https://github.com/tonaljs/tonal'],
   ['VexFlow', 'MIT', '오선보 렌더링', 'https://github.com/0xfe/vexflow'],
   ['React', 'MIT', 'UI', 'https://react.dev'],
@@ -43,7 +43,7 @@ export function AboutPage() {
       </div>
       <div className="card">
         <h3>데이터 저장</h3>
-        <p className="muted">저장한 진행, 추가한 노래, 게임 기록은 이 브라우저의 localStorage에 저장돼요. 라이브러리의 “내보내기”로 JSON 백업을 만들 수 있어요.</p>
+        <p className="muted">저장한 진행, 추가한 노래, 게임 기록은 이 브라우저에 저장되고, claude.ai 링크로 열면 내 claude.ai 계정에도 저장돼 다른 기기에서도 이어져요. 라이브러리의 “내보내기”로 JSON 백업을 만들 수 있어요.</p>
       </div>
     </div>
   );

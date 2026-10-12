@@ -23,10 +23,11 @@ export function onAudioStatus(l: (s: AudioStatus) => void) {
   };
 }
 
-// Salamander Grand Piano (CC-BY 3.0, Alexander Holm) hosted by the Tone.js project.
-const SAMPLE_BASE = 'https://tonejs.github.io/audio/salamander/';
-function salamanderUrls() {
-  const urls: Record<string, string> = { A0: 'A0.mp3', C8: 'C8.mp3' };
+// Piano samples (tonejs-instrument-piano-mp3, MIT) bundled under public/samples,
+// one every minor third from C1 to A7; Tone.Sampler repitches the notes between.
+const SAMPLE_BASE = `${import.meta.env.BASE_URL}samples/`;
+function sampleUrls() {
+  const urls: Record<string, string> = {};
   for (let o = 1; o <= 7; o++) {
     urls[`C${o}`] = `C${o}.mp3`;
     urls[`D#${o}`] = `Ds${o}.mp3`;
@@ -92,7 +93,7 @@ export function ensureAudio(): Promise<void> {
       piano = await new Promise<Tone.Sampler>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('timeout')), 20000);
         const s = new Tone.Sampler({
-          urls: salamanderUrls(),
+          urls: sampleUrls(),
           baseUrl: SAMPLE_BASE,
           release: 1.2,
           onload: () => {

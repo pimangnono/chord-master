@@ -14,6 +14,7 @@ import { chordToRoman, parseBars, progressionToChords, secondaryLabel } from '..
 import { buildTransitionStats, Style, suggestNext } from '../theory/suggest';
 import { voiceChord } from '../theory/voicing';
 import { useStore } from '../store';
+import { IS_ARTIFACT } from '../platform';
 
 type Source = 'mic' | 'midi' | 'keys';
 
@@ -264,10 +265,10 @@ export function ListenPage() {
 
       <div className="card listen-controls">
         <div className="seg big">
-          <button className={source === 'mic' ? 'on' : ''} onClick={() => switchSource('mic')}>
+          <button className={source === 'mic' ? 'on' : ''} onClick={() => switchSource('mic')} disabled={IS_ARTIFACT}>
             🎙️ 마이크 (어쿠스틱 피아노)
           </button>
-          <button className={source === 'midi' ? 'on' : ''} onClick={() => switchSource('midi')}>
+          <button className={source === 'midi' ? 'on' : ''} onClick={() => switchSource('midi')} disabled={IS_ARTIFACT}>
             🎹 MIDI (디지털 피아노)
           </button>
           <button className={source === 'keys' ? 'on' : ''} onClick={() => switchSource('keys')}>
@@ -346,6 +347,11 @@ export function ListenPage() {
             </select>
           </label>
         </div>
+        {IS_ARTIFACT && (
+          <p className="notice">
+            이 claude.ai 링크에서는 보안 정책상 마이크와 MIDI를 쓸 수 없어요. 화면 건반이나 컴퓨터 키보드로 코드를 눌러 보세요. 내 피아노 소리로 인식하려면 앱을 컴퓨터에서 직접 실행(<code>npm run dev</code>)하면 돼요.
+          </p>
+        )}
         {error && <p className="error">{error}</p>}
         {source === 'mic' && !running && (
           <p className="muted small">

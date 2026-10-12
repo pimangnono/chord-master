@@ -12,6 +12,7 @@ import { prettyChord, solfege, splitSlash } from '../theory/notes';
 import { chordToRoman, harmonicFunction, parseBars, secondaryLabel } from '../theory/roman';
 import { voiceChord } from '../theory/voicing';
 import { useStore } from '../store';
+import { ConfirmButton } from '../components/ConfirmButton';
 
 function useAllSongs() {
   const custom = useStore((s) => s.customSongs);
@@ -139,17 +140,15 @@ export function SongPage() {
           <p>{song.about}</p>
         </div>
         {song.custom && (
-          <button
+          <ConfirmButton
+            label="삭제"
+            confirmLabel="이 노래를 삭제할까요?"
             className="btn ghost danger"
-            onClick={() => {
-              if (confirm('이 노래를 삭제할까요?')) {
-                deleteSong(song.id);
-                nav('/songs');
-              }
+            onConfirm={() => {
+              deleteSong(song.id);
+              nav('/songs');
             }}
-          >
-            삭제
-          </button>
+          />
         )}
       </header>
 
