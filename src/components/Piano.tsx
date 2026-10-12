@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { movableDo } from '../theory/keys';
 import { isBlackKey, midiToNote, solfege } from '../theory/notes';
 import { useStore } from '../store';
 
@@ -13,9 +14,11 @@ export interface PianoProps {
   preferFlats?: boolean;
   /** extra per-key caption under the label (e.g. chord role) */
   captions?: Map<number, string>;
+  /** key for 이동도법 labels; without it only fixed-do is shown */
+  keyName?: string;
 }
 
-export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, preferFlats, captions }: PianoProps) {
+export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, preferFlats, captions, keyName }: PianoProps) {
   const labels = useStore((s) => s.pianoLabels);
   const [hover, setHover] = useState<number | null>(null);
   const [down, setDown] = useState<number | null>(null);
@@ -28,12 +31,16 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
   const whiteW = 100 / whites.length;
 
   const posOfWhite = (m: number) => whites.indexOf(m);
+  const showMovable = !!keyName && (labels === 'both' || labels === 'movable');
   const label = (m: number) => {
     const n = midiToNote(m, preferFlats);
     if (labels === 'none') return '';
     if (labels === 'letters') return n.replace(/-?\d+$/, '');
+    if (labels === 'movable' && keyName) return movableDo(n, keyName);
     return solfege(n);
   };
+  /** second line: 이동도 under the fixed-do label */
+  const movable = (m: number) => (showMovable && labels === 'both' ? <i>{movableDo(midiToNote(m, preferFlats), keyName!)}</i> : null);
 
   const press = (m: number) => {
     setDown(m);
@@ -68,6 +75,7 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
         >
           <span className="key-label">
             {captions?.get(m) && <em>{captions.get(m)}</em>}
+            {movable(m)}
             {label(m)}
             {m % 12 === 0 && labels !== 'none' && <small>{Math.floor(m / 12) - 1}</small>}
           </span>
@@ -94,6 +102,7 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
               {(marks?.has(m) || captions?.has(m)) && (
                 <span className="key-label">
                   {captions?.get(m) && <em>{captions.get(m)}</em>}
+                  {movable(m)}
                   {label(m)}
                 </span>
               )}
@@ -105,7 +114,9 @@ export function Piano({ from = 48, to = 84, marks, onDown, onUp, height = 150, p
           className="piano-tip"
           style={{ left: `${(isBlackKey(hover) ? posOfWhite(hover - 1) + 1 : posOfWhite(hover) + 0.5) * whiteW}%` }}
         >
-          <b>{solfege(midiToNote(hover, preferFlats))}</b> {midiToNote(hover, preferFlats).replace('#', '♯').replace(/([A-G])b/, '$1♭')}
+          <b>{solfege(midiToNote(hover, preferFlats))}</b>
+          {keyName && <span className="movable"> · 이동도 {movableDo(midiToNote(hover, preferFlats), keyName)}</span>}{' '}
+          {midiToNote(hover, preferFlats).replace('#', '♯').replace(/([A-G])b/, '$1♭')}
         </div>
       )}
     </div>

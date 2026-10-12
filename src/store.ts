@@ -27,7 +27,8 @@ interface State {
   saved: SavedProgression[];
   customSongs: Song[];
   game: GameProgress;
-  pianoLabels: 'solfege' | 'letters' | 'none';
+  /** both = 고정도 + 이동도 */
+  pianoLabels: 'both' | 'solfege' | 'movable' | 'letters' | 'none';
   saveProgression: (p: Omit<SavedProgression, 'id' | 'createdAt'>) => SavedProgression;
   updateProgression: (id: string, patch: Partial<SavedProgression>) => void;
   deleteProgression: (id: string) => void;
@@ -50,7 +51,7 @@ export const useStore = create<State>()(
       saved: [],
       customSongs: [],
       game: { xp: 0, stars: {}, best: {}, streakDays: 0 },
-      pianoLabels: 'solfege',
+      pianoLabels: 'both',
       saveProgression: (p) => {
         const item: SavedProgression = { ...p, id: uid(), createdAt: Date.now() };
         set((s) => ({ saved: [item, ...s.saved] }));
@@ -83,7 +84,16 @@ export const useStore = create<State>()(
         }),
       setPianoLabels: (pianoLabels) => set({ pianoLabels }),
     }),
-    { name: 'chord-master', version: 1 },
+    {
+      name: 'chord-master',
+      version: 2,
+      migrate: (persisted, version) => {
+        const s = persisted as Partial<State>;
+        // v2 adds 이동도법; people on the old fixed-do default get both systems.
+        if (version < 2 && s.pianoLabels === 'solfege') s.pianoLabels = 'both';
+        return s as State;
+      },
+    },
   ),
 );
 

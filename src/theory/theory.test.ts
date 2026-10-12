@@ -4,7 +4,7 @@ import { buildScore, splitDuration } from '../notation/score';
 import { buildArrangement } from './arrange';
 import { detectFromChroma, detectFromMidi } from './detect';
 import { estimateKey, estimateKeyFromChords } from './key';
-import { intervalBetweenKeys, transposeChord } from './keys';
+import { intervalBetweenKeys, movableDo, transposeChord } from './keys';
 import { prettyChord, solfege } from './notes';
 import { chordToRoman, harmonicFunction, parseBars, progressionToChords, romanToChord, secondaryLabel } from './roman';
 import { suggestNext } from './suggest';
@@ -63,6 +63,18 @@ describe('notes & keys', () => {
     expect(solfege('Bb3')).toBe('시♭');
     expect(solfege('F#5')).toBe('파♯');
     expect(prettyChord('Bbm7b5/F')).toBe('B♭m7♭5/F');
+  });
+  it('names notes in movable do', () => {
+    expect(movableDo('C4', 'C')).toBe('도');
+    expect(movableDo('A4', 'F')).toBe('미');
+    expect(movableDo('F#4', 'D')).toBe('미');
+    expect(movableDo('Bb4', 'C')).toBe('시♭');
+    expect(movableDo('F#4', 'C')).toBe('파♯');
+    expect(movableDo('Eb4', 'Eb')).toBe('도');
+    expect(movableDo('A3', 'Am')).toBe('라');
+    expect(movableDo('G#3', 'Am')).toBe('솔♯');
+    expect(movableDo('G4', 'Gm')).toBe('라');
+    expect(movableDo('Ab4', 'Eb')).toBe('파');
   });
   it('transposes chords', () => {
     expect(transposeChord('E/G#', intervalBetweenKeys('A', 'C'))).toBe('G/B');

@@ -7,7 +7,7 @@ import { ProgressionStudio } from '../components/ProgressionStudio';
 import { GENRE_BY_ID, GENRES, GenreId } from '../data/progressions';
 import { getRhythm, RHYTHMS } from '../data/rhythms';
 import { Song, SONGS } from '../data/songs';
-import { keyLabel, MAJOR_KEYS, MINOR_KEYS } from '../theory/keys';
+import { keyLabel, MAJOR_KEYS, MINOR_KEYS, movableDo } from '../theory/keys';
 import { prettyChord, solfege, splitSlash } from '../theory/notes';
 import { chordToRoman, harmonicFunction, parseBars, secondaryLabel } from '../theory/roman';
 import { voiceChord } from '../theory/voicing';
@@ -201,7 +201,7 @@ export function SongPage() {
                 <th>코드</th>
                 <th>도수</th>
                 <th>기능</th>
-                <th>구성음</th>
+                <th>구성음 (고정도 / 이동도)</th>
               </tr>
             </thead>
             <tbody>
@@ -221,7 +221,11 @@ export function SongPage() {
                     <td>
                       <span className={`fn fn-${fn.code}`}>{fn.label}</span>
                     </td>
-                    <td className="muted">{Chord.get(splitSlash(sym)[0]).notes.map((n) => solfege(n)).join(' · ')}</td>
+                    <td className="muted">
+                      {Chord.get(splitSlash(sym)[0]).notes.map((n) => solfege(n)).join(' · ')}
+                      <br />
+                      <small className="movable">이동도 {Chord.get(splitSlash(sym)[0]).notes.map((n) => movableDo(n, song.key)).join(' · ')}</small>
+                    </td>
                   </tr>
                 );
               })}

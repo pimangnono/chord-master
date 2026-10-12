@@ -1,7 +1,8 @@
-import { Chord, Note } from 'tonal';
+import { Chord, Key, Note } from 'tonal';
 import { playNotes, playSequence } from '../audio/engine';
 import { PROGRESSIONS } from '../data/progressions';
-import { prettyChord, solfege, SOLFEGE_LIST } from '../theory/notes';
+import { movableDo } from '../theory/keys';
+import { prettyChord, prettyNote, solfege, SOLFEGE_LIST } from '../theory/notes';
 import { diatonicChords, parseBars, progressionToChords, romanToChord } from '../theory/roman';
 import { voiceChord, voiceProgression } from '../theory/voicing';
 
@@ -129,6 +130,38 @@ export const STAGES: Stage[] = [
         staffNote: n,
         play: () => playNotes([n], 1),
         explain: `${n} = ${solfege(n)}`,
+      };
+    },
+  },
+  {
+    id: 'movable',
+    title: '이동도법 계이름',
+    icon: '🔁',
+    goal: '조가 바뀌면 “도”도 따라 움직여요',
+    lesson: {
+      title: '고정도 vs 이동도',
+      points: [
+        '고정도: C는 언제나 “도” — 건반의 이름',
+        '이동도: 그 조의 으뜸음이 “도” — 음계 안에서의 역할',
+        'D장조에서는 레(D)가 “도”, 파♯(F#)은 “미”',
+        '단조는 “라”로 시작해요 (A단조: 라–시–도…, D단조: 레가 “라”)',
+      ],
+    },
+    make: () => {
+      const key = pick(['G', 'D', 'F', 'Bb', 'A', 'Eb', 'E']);
+      const pc = pick(Key.majorKey(key).scale);
+      const n = [pc + 4, pc + 5].find((x) => (Note.midi(x) ?? 0) >= 62 && (Note.midi(x) ?? 99) <= 79) ?? pc + 4;
+      const answer = movableDo(n, key);
+      return {
+        prompt: `${prettyNote(key)}장조에서 이 음의 이동도 계이름은?`,
+        sub: `${prettyNote(key)}장조의 으뜸음 ${prettyNote(key)}(${solfege(key)})이 “도”예요`,
+        kind: 'choice',
+        choices: SOLFEGE_LIST,
+        answer,
+        staffNote: n,
+        play: () => playSequence([[key + 4], [n]], 0.6, 0.8),
+        replayLabel: '도 → 이 음 듣기',
+        explain: `${prettyNote(n)}: 고정도 “${solfege(n)}”, ${prettyNote(key)}장조 이동도 “${answer}”`,
       };
     },
   },

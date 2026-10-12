@@ -84,3 +84,33 @@ export function intervalBetweenKeys(from: string, to: string): string {
 export function keyOptionsFor(minor: boolean): string[] {
   return minor ? MINOR_KEYS : MAJOR_KEYS;
 }
+
+const MOVABLE = ['도', '레', '미', '파', '솔', '라', '시'];
+
+/** The note that is "도" in a key. Minor keys use la-based minor (가단조: 라–시–도…), as taught in Korean schools. */
+export function movableDoTonic(key: string): string {
+  const { tonic, minor } = parseKey(key);
+  return minor ? Note.pitchClass(Note.transpose(tonic, '3m')) : tonic;
+}
+
+/**
+ * 이동도법 계이름: the syllable of a note relative to the key.
+ *   movableDo("A4", "F")  → "미"
+ *   movableDo("F#4", "D") → "미"
+ *   movableDo("Bb4", "C") → "시♭"
+ *   movableDo("A3", "Am") → "라"
+ */
+export function movableDo(note: string, key: string): string {
+  const n = Note.get(note);
+  if (n.empty) return note;
+  const ivl = Interval.get(Interval.distance(movableDoTonic(key), n.pc));
+  const deg = ((((ivl.num ?? 1) - 1) % 7) + 7) % 7;
+  const perfect = deg === 0 || deg === 3 || deg === 4;
+  const q = ivl.q;
+  let acc = '';
+  if (q === 'A') acc = '♯';
+  else if (q === 'AA') acc = '𝄪';
+  else if (perfect ? q === 'd' : q === 'm') acc = '♭';
+  else if (perfect ? q === 'dd' : q === 'd') acc = '𝄫';
+  return MOVABLE[deg] + acc;
+}

@@ -43,7 +43,7 @@ function StageMap() {
       <div className="stage-map">
         {STAGES.map((s, i) => {
           const stars = game.stars[s.id] ?? 0;
-          const unlocked = i === 0 || (game.stars[STAGES[i - 1].id] ?? 0) > 0;
+          const unlocked = i === 0 || (game.stars[STAGES[i - 1].id] ?? 0) > 0 || stars > 0;
           return (
             <div key={s.id} className={`stage-node ${i % 2 ? 'right' : 'left'}`}>
               {unlocked ? (

@@ -218,7 +218,7 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
         })}
       </div>
 
-      <Piano from={36} to={84} marks={marks} captions={captions} preferFlats={flats} onDown={(m) => playNotes([Note.fromMidi(m)], 1.2)} />
+      <Piano from={36} to={84} marks={marks} captions={captions} preferFlats={flats} keyName={key} onDown={(m) => playNotes([Note.fromMidi(m)], 1.2)} />
 
       <section className="card">
         <div className="card-head">
@@ -232,7 +232,7 @@ export function ProgressionStudio({ owner, title, chords, baseKey, bpm: initialB
             </button>
           </div>
         </div>
-        <p className="muted small">음표에 마우스를 올리면 계이름과 코드 속 역할이 보여요. 클릭하면 소리가 나요.</p>
+        <p className="muted small">음표에 마우스를 올리면 계이름(고정도·이동도)과 코드 속 역할이 보여요. 클릭하면 소리가 나요.</p>
         <SheetMusic
           chords={keyed}
           rhythm={view === 'accomp' ? rhythm : getRhythm('whole')}

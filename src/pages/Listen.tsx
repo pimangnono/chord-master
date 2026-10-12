@@ -8,7 +8,7 @@ import { PROGRESSIONS } from '../data/progressions';
 import { SONGS } from '../data/songs';
 import { detectFromChroma, detectFromMidi, ChordGuess } from '../theory/detect';
 import { estimateKeyFromChords } from '../theory/key';
-import { keyLabel, keyUsesFlats, MAJOR_KEYS, MINOR_KEYS } from '../theory/keys';
+import { keyLabel, keyUsesFlats, MAJOR_KEYS, MINOR_KEYS, movableDo } from '../theory/keys';
 import { midiToNote, prettyChord, solfege } from '../theory/notes';
 import { chordToRoman, parseBars, progressionToChords, secondaryLabel } from '../theory/roman';
 import { buildTransitionStats, Style, suggestNext } from '../theory/suggest';
@@ -368,6 +368,7 @@ export function ListenPage() {
             {notes.map((m) => (
               <span key={m} className={m === bassMidi ? 'bass' : ''}>
                 {solfege(midiToNote(m, flats))}
+                <i title="이동도법">{movableDo(midiToNote(m, flats), key)}</i>
                 <small>{midiToNote(m, flats)}</small>
               </span>
             ))}
@@ -422,6 +423,7 @@ export function ListenPage() {
         height={130}
         marks={marks}
         preferFlats={flats}
+        keyName={key}
         onDown={
           source === 'keys'
             ? (m) => {

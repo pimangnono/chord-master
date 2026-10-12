@@ -68,7 +68,9 @@ function Sidebar() {
         <label className="field small">
           <span>건반 표시</span>
           <select value={labels} onChange={(e) => setLabels(e.target.value as typeof labels)}>
-            <option value="solfege">계이름 (도레미)</option>
+            <option value="both">고정도 + 이동도</option>
+            <option value="solfege">고정도 계이름만</option>
+            <option value="movable">이동도 계이름만</option>
             <option value="letters">음이름 (CDE)</option>
             <option value="none">표시 안 함</option>
           </select>

@@ -964,6 +964,23 @@ textarea {
   color: #fff;
 }
 
+/* 이동도 (movable do) line above the fixed-do label */
+.key-label i {
+  font-style: normal;
+  font-weight: 800;
+  color: #6b4ff0;
+}
+
+.key.black .key-label i,
+.key.active .key-label i,
+.key.root .key-label i {
+  color: inherit;
+}
+
+.movable {
+  color: #b9a6ff;
+}
+
 .key.white.active,
 .key.white.pressed {
   background: linear-gradient(#c9b8ff, #9c82ff);
@@ -1423,6 +1440,12 @@ textarea {
 
 .now-notes span.bass {
   background: color-mix(in srgb, var(--brand2) 35%, var(--panel2));
+}
+
+.now-notes i {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: #b9a6ff;
 }
 
 .now-notes small {

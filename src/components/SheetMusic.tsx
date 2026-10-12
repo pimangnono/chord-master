@@ -20,6 +20,7 @@ import { buildArrangement } from '../theory/arrange';
 import { prettyChord, prettyNote, solfege } from '../theory/notes';
 import type { ChordEvent } from '../theory/roman';
 import { noteRole } from '../theory/voicing';
+import { movableDo, parseKey, shortKeyLabel } from '../theory/keys';
 
 interface Hit {
   x: number;
@@ -251,6 +252,9 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, onChordClick }:
           <div className="sheet-tip-main">
             <b>{solfege(tip.note)}</b>
             <span>{prettyNote(tip.note)}</span>
+          </div>
+          <div className="sheet-tip-sub movable">
+            이동도 <b>{movableDo(tip.note, keySig)}</b> ({shortKeyLabel(keySig)} 기준{parseKey(keySig).minor ? ', 라 단조' : ''})
           </div>
           <div className="sheet-tip-sub">
             {prettyChord(tip.chord)}의 {noteRole(tip.note, tip.chord) ?? '음'} · {tip.hand === 'rh' ? '오른손' : '왼손'}
