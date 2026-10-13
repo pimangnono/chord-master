@@ -4,3 +4,8 @@ dist
 .DS_Store
 *.tsbuildinfo
 dist-artifact
+
+# secrets — never commit API keys
+.env
+.env.*
+!.env.example
