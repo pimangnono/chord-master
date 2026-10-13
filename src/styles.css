@@ -2781,3 +2781,7 @@ textarea {
   touch-action: manipulation;
   user-select: none;
 }
+
+.secret-input {
+  -webkit-text-security: disc;
+}

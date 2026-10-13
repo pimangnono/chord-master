@@ -330,13 +330,21 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
               <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
                 console.anthropic.com
               </a>
-              에서 키를 만들어 붙여넣으세요. 키는 <b>이 브라우저에만</b> 저장되고 Anthropic 서버로만 보내요. 한 번 찾을 때 몇십 원 정도 들어요.
+              에서 키를 만들어 붙여넣으세요. 키는 <b>어디에도 저장하지 않고</b> 이 페이지를 열어 둔 동안만 기억해요(새로고침하거나 탭을 닫으면 다시 넣어야 해요). Anthropic 서버로만 보내요. 한 번 찾을 때 몇십 원 정도 들어요.
             </p>
             <div className="row gap wrap">
               <input
                 id="api-key"
-                type="password"
+                // a text field drawn as dots, so password managers don't offer to save the key
+                type="text"
+                className="secret-input"
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
                 placeholder="sk-ant-..."
                 value={keyDraft}
                 onChange={(e) => setKeyDraft(e.target.value)}

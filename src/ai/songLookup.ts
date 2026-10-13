@@ -5,31 +5,32 @@ import { buildLookupPrompt, extractJson, LookupInput, normalizeMeta, SongMeta } 
 /**
  * Looks up a song's genre, key, BPM and feel with Claude.
  *
- * - On the website the user brings their own Anthropic API key (kept only
- *   in this browser's localStorage) and Claude searches the web.
+ * - On the website the user brings their own Anthropic API key and Claude
+ *   searches the web. The key lives only in memory for this page load —
+ *   never in localStorage, cookies or the synced store — so a reload or a
+ *   closed tab forgets it.
  * - Inside the claude.ai artifact the page asks Claude through the
  *   viewer's own account (`sample` capability) — no key, but no browsing,
  *   so answers come from what Claude knows.
  */
 
-const KEY_STORAGE = 'chord-master-anthropic-key';
 export const LOOKUP_MODEL = 'claude-opus-5-5';
 
+let apiKeyInMemory = '';
+
+// An earlier version kept the key in localStorage; remove any copy left behind.
+try {
+  localStorage.removeItem('chord-master-anthropic-key');
+} catch {
+  /* storage blocked — nothing to clean up */
+}
+
 export function getApiKey(): string {
-  try {
-    return localStorage.getItem(KEY_STORAGE) ?? '';
-  } catch {
-    return '';
-  }
+  return apiKeyInMemory;
 }
 
 export function setApiKey(key: string) {
-  try {
-    if (key) localStorage.setItem(KEY_STORAGE, key.trim());
-    else localStorage.removeItem(KEY_STORAGE);
-  } catch {
-    /* storage blocked — the key just isn't remembered */
-  }
+  apiKeyInMemory = key.trim();
 }
 
 export class LookupError extends Error {
