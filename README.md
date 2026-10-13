@@ -50,6 +50,21 @@ npm run dev            # 키를 바꾸면 서버를 껐다 켜기
 
 키는 로컬 Vite 서버(Node)만 읽고, 앱은 `/api/song-lookup`을 통해 서버에 부탁합니다. `VITE_` 접두사가 없어서 빌드 결과물이나 브라우저로는 절대 가지 않고, `.env`는 `.gitignore`에 들어 있습니다. 엔드포인트는 이 앱의 노래 정보 찾기만 하며 다른 사이트에서 오는 요청은 거절합니다. GitHub Pages 같은 정적 사이트에는 서버가 없어서 자동 찾기 버튼이 꺼지고 설정 방법을 안내합니다.
 
+### 원곡에 박자 맞추기 (유튜브 링크)
+
+가사 위에 코드가 적힌 악보는 코드 순서만 있고 길이가 없어서, 붙여넣은 그대로는 원곡과 박자가 어긋납니다. 노래 추가/편집 화면의 **🎧 원곡에 박자 맞추기**에 유튜브 링크(또는 음원 파일)를 넣으면:
+
+1. 로컬 서버가 [yt-dlp](https://github.com/yt-dlp/yt-dlp)로 영상의 오디오를 메모리로 스트리밍합니다 (파일로 저장하지 않음).
+2. 브라우저가 박자를 추적하고 박자별 크로마를 구합니다.
+3. 악보의 코드 순서를 그대로 둔 채, 각 코드가 원곡의 어디서 시작하는지 반 마디 단위로 맞춥니다(세그먼트 동적 계획법). 악보가 원곡과 다른 키로 적혀 있으면 12개 키를 모두 시험해 원곡 키로 옮깁니다.
+
+```bash
+brew install yt-dlp    # Mac (Windows: winget install yt-dlp)
+npm run dev
+```
+
+yt-dlp가 PATH에 없으면 `.env`에 `YTDLP_PATH=`로 경로를 적습니다. 유튜브 영상 다운로드는 유튜브 이용약관에 어긋날 수 있으니 개인 연습용으로만 쓰세요. GitHub Pages 사이트와 claude.ai 아티팩트에서는 음원 파일로만 맞출 수 있습니다.
+
 마이크 사용에는 `localhost` 또는 HTTPS가 필요합니다. 피아노 샘플은 앱에 내장돼 있어 오프라인에서도 동작합니다.
 
 `npm run build:artifact`는 claude.ai 아티팩트용 빌드(`dist-artifact/`)를 만듭니다. 아티팩트에서는 플랫폼 정책상 마이크·MIDI를 쓸 수 없어 화면/키보드 입력만 지원하고, 저장 데이터는 claude.ai 계정(db capability)에 동기화됩니다.
@@ -72,7 +87,7 @@ src/
   data/       장르·시대 진행, 반주 리듬 패턴, 노래
   game/       화성학 게임 스테이지
   ai/         Claude로 노래 정보(장르·조성·BPM·리듬) 찾기 — 프롬프트·결과 검증
-server/       로컬 Vite 서버의 /api/song-lookup (.env 키로 Claude 호출)
+server/       로컬 Vite 서버 API: /api/song-lookup (.env 키로 Claude 호출), /api/youtube-audio (yt-dlp 스트리밍)
   pages/      화면
 ```
 

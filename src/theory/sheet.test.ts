@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeChord, parseChordSheet, sectionName, toBarText } from './sheet';
+import { linesToBarText, normalizeChord, parseChordSheet, sectionName, toBarText } from './sheet';
 
 describe('chord sheet import', () => {
   it('normalises chord spellings', () => {
@@ -58,6 +58,26 @@ Speaking words of wisdom, let it be`;
     expect(r.sections[0].chords.slice(0, 4)).toEqual(['A', 'E', 'F#m', 'D']);
     expect(r.sections[0].chords).toHaveLength(12);
     expect(parseChordSheet('Capo 2\nG D Em C', false).sections[0].chords).toEqual(['G', 'D', 'Em', 'C']);
+  });
+
+  it('reads the key written on the sheet and keeps repeats when asked', () => {
+    const sheet = 'C\n[Verse 1]\nC   Em  Am7\n기쁨 뒤에 슬픔이 오는 건\nDm7 G Em7 A7\n아름다운 마음이야\n\nC  C/B\nAm7  Em\nF\nG\n[Chorus]\nC  Em\n이보다 더 좋은 것은 없어\n[Verse 2]\nC   Em  Am7\n기쁨 뒤에 슬픔이 오는 건\nDm7 G Em7 A7\n아름다운 마음이야\n\nC  C/B\nAm7  Em\nF\nG';
+    const r = parseChordSheet(sheet);
+    expect(r.declaredKey).toBe('C');
+    expect(r.key).toBe('C');
+    expect(r.sections[0].chords[0]).toBe('C'); // the key line is not a chord of the song
+    expect(r.sections.map((s) => s.name)).toEqual(['벌스 1', '후렴']);
+    const full = parseChordSheet(sheet, true, { keepRepeats: true });
+    expect(full.sections.map((s) => s.name)).toEqual(['벌스 1', '후렴', '벌스 2']);
+    // lyric lines last 2 bars, bare chord lines 1 bar
+    expect(linesToBarText(full.sections[0].lines)).toBe('C | Em Am7 | Dm7 G | Em7 A7 | C C/B | Am7 Em | F | G');
+    expect(parseChordSheet('Key: Bb\nBb F Gm Eb').declaredKey).toBe('Bb');
+  });
+
+  it('spreads many chords over a longer lyric line', () => {
+    expect(linesToBarText([{ chords: ['Bb', 'A7', 'Dm7', 'Em', 'Am7'], lyric: true }])).toBe('Bb | A7 Dm7 | Em Am7');
+    expect(linesToBarText([{ chords: ['G'], lyric: true }])).toBe('G:8');
+    expect(linesToBarText([{ chords: ['A', 'A', 'Bm7', 'Dm'], lyric: false }])).toBe('A | A | Bm7 | Dm');
   });
 
   it('formats bars', () => {

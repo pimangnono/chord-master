@@ -244,15 +244,24 @@ function stateName(s: number, flats: boolean | undefined) {
   return pcName(s % 12, flats) + TYPES[t].suffix;
 }
 
-/** Full analysis of mono samples at `sr`. */
-export async function analyzeSamples(x: Float32Array, sr: number, onProgress?: (p: number) => void): Promise<SongAnalysis> {
-  const frames = await computeFrames(x, sr, (p) => onProgress?.(p * 0.85));
+/** Beat-synchronous features: one averaged chroma/bass vector per tracked beat. */
+export interface BeatFeatures {
+  /** seconds at which each beat starts */
+  beatTimes: number[];
+  bpm: number;
+  chroma: Float32Array[];
+  bass: Float32Array[];
+  silent: boolean[];
+  duration: number;
+}
+
+export async function beatFeatures(x: Float32Array, sr: number, onProgress?: (p: number) => void): Promise<BeatFeatures> {
+  const frames = await computeFrames(x, sr, onProgress);
   const frameRate = sr / HOP;
   const { beats, bpm, period } = trackBeats(frames.flux, frameRate);
   const maxE = Math.max(...frames.energy);
-  // beat-synchronous averages
-  const bc: Float32Array[] = [];
-  const bb: Float32Array[] = [];
+  const chroma: Float32Array[] = [];
+  const bass: Float32Array[] = [];
   const silent: boolean[] = [];
   for (let i = 0; i < beats.length; i++) {
     const a = beats[i];
@@ -267,10 +276,16 @@ export async function analyzeSamples(x: Float32Array, sr: number, onProgress?: (
       }
       e = Math.max(e, frames.energy[f] ?? 0);
     }
-    bc.push(c);
-    bb.push(d);
+    chroma.push(c);
+    bass.push(d);
     silent.push(e < maxE * 0.02);
   }
+  return { beatTimes: beats.map((f) => (f * HOP) / sr), bpm, chroma, bass, silent, duration: x.length / sr };
+}
+
+/** Full analysis of mono samples at `sr`. */
+export async function analyzeSamples(x: Float32Array, sr: number, onProgress?: (p: number) => void): Promise<SongAnalysis> {
+  const { beatTimes, bpm, chroma: bc, bass: bb, silent } = await beatFeatures(x, sr, (p) => onProgress?.(p * 0.85));
   onProgress?.(0.9);
   const path = decodeChords(bc, bb, silent);
 
@@ -291,7 +306,7 @@ export async function analyzeSamples(x: Float32Array, sr: number, onProgress?: (
       phase = p;
     }
   }
-  const beatTime = (i: number) => (beats[i] * HOP) / sr;
+  const beatTime = (i: number) => beatTimes[i];
   const changes: SongAnalysis['changes'] = [];
   names.forEach((n, i) => {
     if (i < phase) return;
@@ -338,9 +353,9 @@ export async function analyzeSamples(x: Float32Array, sr: number, onProgress?: (
   return { bpm, key, sections, changes, duration: x.length / sr };
 }
 
-/** Decodes an audio file and resamples it to mono 22.05 kHz with the Web Audio API. */
-export async function decodeAudioFile(file: File): Promise<Float32Array> {
-  const buf = await file.arrayBuffer();
+/** Decodes audio (a file, or bytes streamed from the local server) to mono 22.05 kHz with the Web Audio API. */
+export async function decodeAudioFile(file: Blob | ArrayBuffer): Promise<Float32Array> {
+  const buf = file instanceof ArrayBuffer ? file : await file.arrayBuffer();
   const tmp = new AudioContext();
   try {
     const audio = await tmp.decodeAudioData(buf);

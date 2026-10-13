@@ -7,6 +7,7 @@ const LIBS = [
   ['React Router', 'MIT', '페이지 이동', 'https://reactrouter.com'],
   ['Zustand', 'MIT', '상태 관리·로컬 저장', 'https://github.com/pmndrs/zustand'],
   ['Vite', 'MIT', '개발 서버·빌드', 'https://vitejs.dev'],
+  ['yt-dlp', 'Unlicense', '원곡에 박자 맞추기 — 유튜브 오디오 스트리밍 (내 컴퓨터에서 따로 설치)', 'https://github.com/yt-dlp/yt-dlp'],
   ['Anthropic TypeScript SDK', 'MIT', '노래 정보 자동 찾기 (Claude API · 내 컴퓨터의 로컬 서버에서만 실행)', 'https://github.com/anthropics/anthropic-sdk-typescript'],
 ];
 

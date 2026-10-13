@@ -2,11 +2,19 @@ import { Chord, Interval } from 'tonal';
 import { estimateKeyFromChords } from './key';
 import { transposeChord } from './keys';
 import { splitSlash } from './notes';
-import { parseBars } from './roman';
+import { ChordEvent, chordsToBars, parseBars } from './roman';
+
+export interface SheetLine {
+  chords: string[];
+  /** a lyric line sits under these chords (vs. a bare chord line, e.g. an interlude) */
+  lyric: boolean;
+}
 
 export interface SheetSection {
   name: string;
   chords: string[];
+  /** the chords line by line, as laid out on the sheet */
+  lines: SheetLine[];
 }
 
 export interface ParsedSheet {
@@ -15,8 +23,17 @@ export interface ParsedSheet {
   unknown: string[];
   capo: number;
   key?: string;
+  /** key written on the sheet itself ("Key: C", or a lone chord above the first heading) */
+  declaredKey?: string;
   chordCount: number;
 }
+
+export interface ParseOptions {
+  /** keep sections whose chords repeat an earlier one (the whole song in order) */
+  keepRepeats?: boolean;
+}
+
+const KEY_LINE = /^\s*(?:original\s+)?(?:key|키|조성)\s*[:=]?\s*([A-G][#b♯♭]?m?)\s*$/i;
 
 const SECTION_NAMES: [RegExp, string][] = [
   [/^pre[\s-]?chorus/i, '프리코러스'],
@@ -109,40 +126,81 @@ function chordsInLine(line: string, unknown: string[]): string[] | null {
  * Pulls the chord progression out of a pasted chord sheet (chords above
  * lyrics, ChordPro, or bare chord lines). Lyrics are discarded.
  */
-export function parseChordSheet(text: string, applyCapo = true): ParsedSheet {
+export function parseChordSheet(text: string, applyCapo = true, opts: ParseOptions = {}): ParsedSheet {
   const unknown: string[] = [];
   const capoMatch = text.match(/capo[^0-9\n]{0,12}(\d{1,2})/i) ?? text.match(/카포[^0-9\n]{0,6}(\d{1,2})/);
   const capo = capoMatch ? Number(capoMatch[1]) : 0;
   const sections: SheetSection[] = [];
-  let current: SheetSection = { name: '파트 1', chords: [] };
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) continue;
+  let current: SheetSection = { name: '파트 1', chords: [], lines: [] };
+  let declaredKey: string | undefined;
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const isChordLine = (l: string) => !sectionName(l) && chordsInLine(l, []) !== null;
+  lines.forEach((line, i) => {
+    const keyLine = line.match(KEY_LINE);
+    if (keyLine) {
+      declaredKey ??= normalizeChord(keyLine[1]);
+      return;
+    }
     const name = sectionName(line);
     if (name && !normalizeChord(line.trim())) {
       if (current.chords.length) sections.push(current);
-      current = { name, chords: [] };
-      continue;
+      current = { name, chords: [], lines: [] };
+      return;
     }
     const chords = chordsInLine(line, unknown);
-    if (chords) current.chords.push(...chords);
-  }
+    if (!chords) return;
+    // a lone chord above the first heading is the sheet's key, not music
+    if (!sections.length && !current.chords.length && chords.length === 1 && line.trim().split(/\s+/).length === 1 && lines[i + 1] && sectionName(lines[i + 1])) {
+      declaredKey ??= chords[0];
+      return;
+    }
+    const next = lines[i + 1];
+    current.chords.push(...chords);
+    current.lines.push({ chords, lyric: !!next && !sectionName(next) && !isChordLine(next) });
+  });
   if (current.chords.length) sections.push(current);
 
-  // Same chords under a repeated heading (Verse 2, Chorus again) add nothing to learn.
+  // Same chords under a repeated heading (Verse 2, Chorus again) add nothing to learn —
+  // unless the whole song is wanted in order (to play along with the recording).
   const seen = new Set<string>();
-  let unique = sections.filter((s) => {
-    const sig = s.chords.join(' ');
-    if (seen.has(sig)) return false;
-    seen.add(sig);
-    return true;
-  });
+  let unique = opts.keepRepeats
+    ? sections
+    : sections.filter((s) => {
+        const sig = s.chords.join(' ');
+        if (seen.has(sig)) return false;
+        seen.add(sig);
+        return true;
+      });
   if (capo && applyCapo) {
     const ivl = Interval.fromSemitones(capo);
-    unique = unique.map((s) => ({ ...s, chords: s.chords.map((c) => transposeChord(c, ivl)) }));
+    const tr = (c: string) => transposeChord(c, ivl);
+    unique = unique.map((s) => ({ ...s, chords: s.chords.map(tr), lines: s.lines.map((l) => ({ ...l, chords: l.chords.map(tr) })) }));
+    if (declaredKey) declaredKey = transposeChord(declaredKey, ivl);
   }
   const all = unique.flatMap((s) => s.chords);
-  const key = estimateKeyFromChords(all, Infinity, 1)[0]?.key;
-  return { sections: unique, unknown: [...new Set(unknown)], capo, key, chordCount: all.length };
+  const key = declaredKey ?? estimateKeyFromChords(all, Infinity, 1)[0]?.key;
+  return { sections: unique, unknown: [...new Set(unknown)], capo, key, declaredKey, chordCount: all.length };
+}
+
+/**
+ * Lays a section out by the sheet's lines: a lyric line lasts `barsPerLyricLine`
+ * bars (more when it carries many chords), a bare chord line one bar per one or
+ * two chords. Chords share a line in half-bar steps, the first ones getting
+ * the longer share. Only an estimate — the recording decides (see alignChords).
+ */
+export function linesToBarText(lines: SheetLine[], barsPerLyricLine = 2): string {
+  const events: ChordEvent[] = [];
+  for (const line of lines) {
+    const n = line.chords.length;
+    const bars = line.lyric ? Math.max(barsPerLyricLine, Math.ceil(n / 2)) : n <= 2 ? 1 : n;
+    const halves = bars * 2;
+    const unit = n > halves ? (bars * 4) / n : 2;
+    const units = n > halves ? n : halves;
+    const base = Math.floor(units / n);
+    const extra = units % n;
+    line.chords.forEach((c, i) => events.push({ symbol: c, beats: (base + (i < extra ? 1 : 0)) * unit }));
+  }
+  return chordsToBars(events);
 }
 
 /** Section chords → the app's bar text ("C | G | Am F"), `perBar` chords per bar. */

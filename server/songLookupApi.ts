@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Plugin } from 'vite';
 import { GENRES, GenreId } from '../src/data/progressions';
 import { LookupError } from '../src/ai/songMeta';
 import { lookupWithClaude } from './claudeLookup';
@@ -12,10 +11,8 @@ import { lookupWithClaude } from './claudeLookup';
  *   GET  → { available: boolean }
  *   POST { title, artist, chords, genre } → LookupResult | { error: { code, message } }
  */
-export function songLookupApi(apiKey: string | undefined): Plugin {
-  const handler = async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    const path = (req.url ?? '').split('?')[0];
-    if (!path.endsWith('/api/song-lookup')) return next();
+export function songLookupHandler(apiKey: string | undefined) {
+  return async (req: IncomingMessage, res: ServerResponse) => {
     const send = (status: number, body: unknown) => {
       res.statusCode = status;
       res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -61,15 +58,5 @@ export function songLookupApi(apiKey: string | undefined): Plugin {
       const err = e instanceof LookupError ? e : new LookupError('찾는 중 오류가 났어요.', 'network');
       if (!res.writableEnded && !ctl.signal.aborted) send(502, { error: { code: err.code, message: err.message } });
     }
-  };
-
-  return {
-    name: 'song-lookup-api',
-    configureServer(server) {
-      server.middlewares.use(handler);
-    },
-    configurePreviewServer(server) {
-      server.middlewares.use(handler);
-    },
   };
 }

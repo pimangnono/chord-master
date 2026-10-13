@@ -2777,3 +2777,14 @@ textarea {
   user-select: none;
 }
 
+
+.grow-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.sync-box {
+  margin-bottom: 10px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--good) 40%, var(--line));
+}

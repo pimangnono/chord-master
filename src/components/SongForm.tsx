@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chord } from 'tonal';
 import { useNavigate } from 'react-router-dom';
 import { analyzeSamples, ANALYSIS_RATE, decodeAudioFile } from '../audio/songAnalysis';
+import { fetchYoutubeAudio, looksLikeYoutube, youtubeAvailable } from '../audio/youtube';
 import { GENRES, GenreId } from '../data/progressions';
 import { RHYTHMS } from '../data/rhythms';
 import type { Song } from '../data/songs';
@@ -9,10 +10,11 @@ import { estimateKeyFromChords } from '../theory/key';
 import { keyLabel, MAJOR_KEYS, MINOR_KEYS } from '../theory/keys';
 import { prettyChord, splitSlash } from '../theory/notes';
 import { parseBars } from '../theory/roman';
-import { parseChordSheet, respaceChords, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
+import { linesToBarText, parseChordSheet, respaceChords, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
 import { useStore } from '../store';
 import { LookupError, LookupMode, lookupMode, LookupResult, lookupSongMeta } from '../ai/songLookup';
 import { keyAdvice, KeyAdvice, keyShift } from '../ai/songMeta';
+import { SyncToRecording } from './SyncToRecording';
 import { TapTempo } from './TapTempo';
 
 type Method = 'paste' | 'audio' | 'manual';
@@ -57,9 +59,11 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
 
   // paste
   const [sheet, setSheet] = useState('');
-  const [perBar, setPerBar] = useState(1);
+  // 'line' = lay chords out by the sheet's lyric lines (2 bars each)
+  const [perBar, setPerBar] = useState<'line' | 1 | 2>('line');
   const [useCapo, setUseCapo] = useState(true);
-  const parsed = useMemo(() => (sheet.trim() ? parseChordSheet(sheet, useCapo) : null), [sheet, useCapo]);
+  const [keepRepeats, setKeepRepeats] = useState(true);
+  const parsed = useMemo(() => (sheet.trim() ? parseChordSheet(sheet, useCapo, { keepRepeats }) : null), [sheet, useCapo, keepRepeats]);
 
   // audio
   const fileRef = useRef<HTMLInputElement>(null);
@@ -75,10 +79,37 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
 
   const applySheet = () => {
     if (!parsed || !parsed.sections.length) return;
-    fill(parsed.sections.map((s) => `${s.name}: ${toBarText(s.chords, perBar)}`).join('\n'), parsed.key, '붙여넣은 코드 악보');
+    const bars = (s: (typeof parsed.sections)[number]) => (perBar === 'line' ? linesToBarText(s.lines) : toBarText(s.chords, perBar));
+    fill(parsed.sections.map((s) => `${s.name}: ${bars(s)}`).join('\n'), parsed.key, '붙여넣은 코드 악보');
   };
 
-  const analyzeFile = async (file: File) => {
+  const [ytOk, setYtOk] = useState(false);
+  const [ytUrl, setYtUrl] = useState('');
+  const [ytBytes, setYtBytes] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    youtubeAvailable().then((v) => live && setYtOk(v));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const analyzeYoutube = async () => {
+    if (!looksLikeYoutube(ytUrl)) return setError('유튜브 영상 링크를 넣어 주세요.');
+    setError(null);
+    setYtBytes(0);
+    try {
+      const buf = await fetchYoutubeAudio(ytUrl, undefined, setYtBytes);
+      setYtBytes(null);
+      await analyzeFile(buf);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '유튜브 음원을 가져오지 못했어요.');
+    } finally {
+      setYtBytes(null);
+    }
+  };
+
+  const analyzeFile = async (file: File | ArrayBuffer) => {
     setError(null);
     setAudioNote(null);
     setProgress(0);
@@ -88,7 +119,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
       const r = await analyzeSamples(samples, ANALYSIS_RATE, setProgress);
       if (!r.sections.length) throw new Error('코드를 찾지 못했어요. 소리가 들어 있는 음원인지 확인해 주세요.');
       setBpm(Math.min(200, Math.max(50, r.bpm)));
-      if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
+      if (!title && file instanceof File) setTitle(file.name.replace(/\.[^.]+$/, ''));
       fill(r.sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), r.key, '음원 자동 분석');
       setAudioNote(`템포 약 ${r.bpm} BPM · ${Math.round(r.duration)}초 분석 · 같은 8마디가 반복되는 부분은 한 번만 남겼어요.`);
     } catch (e) {
@@ -237,7 +268,10 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
               ) : (
                 <>
                   <p className="small">
-                    코드 {parsed.chordCount}개 · 섹션 {parsed.sections.length}개 · 추정 조성 <b>{parsed.key ? keyLabel(parsed.key) : '?'}</b>
+                    코드 {parsed.chordCount}개 · 섹션 {parsed.sections.length}개 · {parsed.declaredKey ? '악보에 적힌 조성' : '추정 조성'} <b>{parsed.key ? keyLabel(parsed.key) : '?'}</b>
+                    <label className="inline-check">
+                      <input type="checkbox" checked={keepRepeats} onChange={(e) => setKeepRepeats(e.target.checked)} /> 반복 파트도 원곡 순서대로 모두
+                    </label>
                     {parsed.capo > 0 && (
                       <label className="inline-check">
                         <input type="checkbox" checked={useCapo} onChange={(e) => setUseCapo(e.target.checked)} /> 카포 {parsed.capo} 반영 (실제 소리 높이로)
@@ -258,7 +292,8 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
                   <div className="row gap wrap">
                     <label className="field">
                       <span>한 마디에 코드</span>
-                      <select value={perBar} onChange={(e) => setPerBar(+e.target.value)}>
+                      <select value={perBar} onChange={(e) => setPerBar(e.target.value === 'line' ? 'line' : (+e.target.value as 1 | 2))}>
+                        <option value="line">가사 한 줄 = 2마디 (추천)</option>
                         <option value={1}>1개 (4박)</option>
                         <option value={2}>2개 (2박씩)</option>
                       </select>
@@ -284,6 +319,15 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
               {progress !== null ? `분석 중… ${Math.round(progress * 100)}%` : '🎧 음원 파일 선택'}
             </button>
             <input ref={fileRef} type="file" accept="audio/*" hidden onChange={(e) => e.target.files?.[0] && analyzeFile(e.target.files[0])} />
+            {ytOk && (
+              <>
+                <span className="muted small">또는</span>
+                <input className="grow-input" placeholder="유튜브 링크" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} />
+                <button className="btn ghost" disabled={progress !== null || ytBytes !== null || !ytUrl.trim()} onClick={analyzeYoutube}>
+                  {ytBytes !== null ? `받는 중… ${(ytBytes / 1048576).toFixed(1)}MB` : '유튜브로 분석'}
+                </button>
+              </>
+            )}
             {progress !== null && (
               <div className="meter wide">
                 <div style={{ width: `${Math.round(progress * 100)}%` }} />
@@ -442,6 +486,18 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
           ))}
           <span className="small muted">— 연주가 노래보다 빨리 넘어가면 길게, 늦으면 짧게</span>
         </div>
+      )}
+      {allChords.length > 0 && !bad.length && (
+        <SyncToRecording
+          sections={sections}
+          bpm={bpm}
+          songKey={key}
+          onApply={(t, b, k) => {
+            setText(t);
+            setBpm(Math.min(220, Math.max(40, b)));
+            setKey(k);
+          }}
+        />
       )}
       {error && <p className="error">{error}</p>}
       <div className="row gap">
