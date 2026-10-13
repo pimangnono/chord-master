@@ -9,8 +9,11 @@ import { estimateKeyFromChords } from '../theory/key';
 import { keyLabel, MAJOR_KEYS, MINOR_KEYS } from '../theory/keys';
 import { prettyChord, splitSlash } from '../theory/notes';
 import { parseBars } from '../theory/roman';
-import { parseChordSheet, toBarText } from '../theory/sheet';
+import { parseChordSheet, respaceChords, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
 import { useStore } from '../store';
+import { getApiKey, LOOKUP_NEEDS_KEY, LookupError, LookupResult, lookupSongMeta, setApiKey } from '../ai/songLookup';
+import { keyAdvice, KeyAdvice, keyShift } from '../ai/songMeta';
+import { TapTempo } from './TapTempo';
 
 type Method = 'paste' | 'audio' | 'manual';
 
@@ -46,6 +49,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const [key, setKey] = useState(initial?.key ?? 'C');
   const [bpm, setBpm] = useState(initial?.bpm ?? 90);
   const [genre, setGenre] = useState<GenreId>(initial?.genre ?? 'pop');
+  const [subtype, setSubtype] = useState<string | undefined>(initial?.subtype);
   const [rhythm, setRhythm] = useState(initial?.rhythm ?? 'pop8');
   const [text, setText] = useState(initial ? initial.sections.map((s) => `${s.name}: ${s.chords}`).join('\n') : '');
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +102,67 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const allChords = sections.flatMap((s) => parseBars(s.chords).map((c) => c.symbol));
   const bad = [...new Set(allChords.filter((sym) => Chord.get(splitSlash(sym)[0]).empty))];
   const guessKey = allChords.length ? estimateKeyFromChords(allChords, Infinity, 1)[0]?.key : undefined;
+  const subtypes = GENRES.find((g) => g.id === genre)?.subtypes;
+  const sameLength = sections.length ? sections.map((s) => uniformChordBeats(s.chords)) : [];
+  const chordBeats = sameLength.length && sameLength.every((b) => b !== undefined && b === sameLength[0]) ? sameLength[0] : undefined;
+
+  const respace = (beats: 2 | 4 | 8) => setText(sections.map((s) => `${s.name}: ${respaceChords(s.chords, beats)}`).join('\n'));
+
+  // ── auto-fill (Claude) ──
+  const [hasKey, setHasKey] = useState(() => !!getApiKey());
+  const [keyDraft, setKeyDraft] = useState('');
+  const [editKey, setEditKey] = useState(false);
+  const [looking, setLooking] = useState(false);
+  const [lookup, setLookup] = useState<{ meta: LookupResult; advice: KeyAdvice } | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const runLookup = async () => {
+    if (!title.trim()) return setLookupError('제목을 먼저 입력해 주세요.');
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setLooking(true);
+    setLookupError(null);
+    setLookup(null);
+    try {
+      const meta = await lookupSongMeta({ title: title.trim(), artist: artist.trim(), chords: allChords }, genre, ctl.signal);
+      const advice = keyAdvice(meta.key, allChords);
+      setGenre(meta.genre);
+      setSubtype(meta.subtype);
+      if (meta.bpm) setBpm(meta.bpm);
+      setRhythm(meta.rhythm);
+      if (advice.kind === 'use') setKey(advice.key);
+      else if (advice.kind === 'transposed') setKey(advice.chordKey);
+      setLookup({ meta, advice });
+    } catch (e) {
+      if (e instanceof LookupError) {
+        if (e.code === 'bad_key' || e.code === 'no_key') setEditKey(true);
+        if (e.code !== 'cancelled') setLookupError(e.message);
+      } else setLookupError('찾는 중 오류가 났어요.');
+    } finally {
+      if (abortRef.current === ctl) abortRef.current = null;
+      setLooking(false);
+    }
+  };
+
+  const moveToRecordingKey = () => {
+    if (lookup?.advice.kind !== 'transposed') return;
+    const { chordKey, recordingKey } = lookup.advice;
+    const ivl = keyShift(chordKey, recordingKey);
+    setText(sections.map((s) => `${s.name}: ${transposeBarText(s.chords, ivl)}`).join('\n'));
+    setKey(recordingKey);
+    setLookup({ ...lookup, advice: { kind: 'use', key: recordingKey } });
+  };
+
+  const saveKey = () => {
+    if (!keyDraft.trim()) return;
+    setApiKey(keyDraft.trim());
+    setKeyDraft('');
+    setHasKey(true);
+    setEditKey(false);
+    setLookupError(null);
+  };
 
   const submit = () => {
     if (!title.trim()) return setError('제목을 입력해 주세요.');
@@ -109,6 +174,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
       title: title.trim(),
       artist: artist.trim() || '직접 입력',
       genre,
+      subtype: subtypes ? subtype : undefined,
       key,
       bpm,
       rhythm,
@@ -233,10 +299,130 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         </div>
       )}
 
+      <div className="import-box lookup-box">
+        <div className="row gap wrap center-y">
+          <button className="btn" id="song-lookup" disabled={looking || (LOOKUP_NEEDS_KEY && !hasKey)} onClick={runLookup}>
+            {looking ? '🔎 찾는 중…' : '🔎 장르 · 조성 · BPM · 반주 리듬 자동으로 찾기'}
+          </button>
+          {looking && (
+            <button className="btn ghost small" onClick={() => abortRef.current?.abort()}>
+              취소
+            </button>
+          )}
+          {LOOKUP_NEEDS_KEY && hasKey && !editKey && !looking && (
+            <button className="link-btn small" onClick={() => setEditKey(true)}>
+              API 키 바꾸기
+            </button>
+          )}
+        </div>
+        {looking && (
+          <p className="muted small">
+            {LOOKUP_NEEDS_KEY ? 'Claude가 웹에서 BPM·조성 정보를 찾고 있어요. 20초~1분쯤 걸려요.' : 'Claude에게 이 노래의 BPM·조성을 물어보고 있어요.'}
+          </p>
+        )}
+        {!looking && !lookup && !lookupError && (!LOOKUP_NEEDS_KEY || hasKey) && (
+          <p className="muted small">제목과 아티스트{allChords.length ? ', 넣은 코드' : ''}를 보고 Claude가 {LOOKUP_NEEDS_KEY ? '웹 검색으로 ' : ''}찾아 아래 칸을 채워요. 코드를 먼저 넣으면 코드 키가 원곡과 같은지도 알려줘요.</p>
+        )}
+        {LOOKUP_NEEDS_KEY && (!hasKey || editKey) && (
+          <div className="api-key-box">
+            <p className="small">
+              자동 찾기는 <b>Anthropic API 키</b>로 Claude의 웹 검색을 써요.{' '}
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
+                console.anthropic.com
+              </a>
+              에서 키를 만들어 붙여넣으세요. 키는 <b>이 브라우저에만</b> 저장되고 Anthropic 서버로만 보내요. 한 번 찾을 때 몇십 원 정도 들어요.
+            </p>
+            <div className="row gap wrap">
+              <input
+                id="api-key"
+                type="password"
+                autoComplete="off"
+                placeholder="sk-ant-..."
+                value={keyDraft}
+                onChange={(e) => setKeyDraft(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && saveKey()}
+              />
+              <button className="btn small" onClick={saveKey} disabled={!keyDraft.trim()}>
+                키 저장
+              </button>
+              {hasKey && (
+                <>
+                  <button className="btn ghost small" onClick={() => setEditKey(false)}>
+                    닫기
+                  </button>
+                  <button
+                    className="btn ghost small"
+                    onClick={() => {
+                      setApiKey('');
+                      setHasKey(false);
+                    }}
+                  >
+                    키 지우기
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {lookupError && <p className="error">{lookupError}</p>}
+        {lookup && (
+          <div className="lookup-result" id="lookup-result">
+            <p className="small">
+              <span className={`tag conf-${lookup.meta.confidence}`}>
+                {{ high: '확실', medium: '대체로 맞음', low: '추정 — 꼭 확인' }[lookup.meta.confidence]}
+              </span>{' '}
+              {GENRES.find((g) => g.id === lookup.meta.genre)?.name}
+              {lookup.meta.key && ` · 원곡 ${keyLabel(lookup.meta.key)}`}
+              {lookup.meta.bpm && ` · ${lookup.meta.bpm} BPM`} · {lookup.meta.timeSignature} · {RHYTHMS.find((r) => r.id === lookup.meta.rhythm)?.name}
+              <span className="muted"> — 아래 칸에 채웠어요</span>
+            </p>
+            {lookup.meta.note && <p className="small">{lookup.meta.note}</p>}
+            {lookup.meta.timeSignature === '3/4' && <p className="small warn-text">이 앱은 4/4 박자로 연주해요. 3/4 곡은 박자가 어긋나니 참고만 해 주세요.</p>}
+            {(lookup.meta.timeSignature === '6/8' || lookup.meta.timeSignature === '12/8') && (
+              <p className="small warn-text">셋잇단 느낌({lookup.meta.timeSignature}) 곡이라 12/8 슬로우잼 리듬으로 맞췄어요. BPM은 점4분음표 기준이에요.</p>
+            )}
+            {lookup.advice.kind === 'transposed' && (
+              <div className="row gap wrap center-y">
+                <p className="small warn-text">
+                  넣은 코드는 <b>{keyLabel(lookup.advice.chordKey)}</b>인데 원곡은 <b>{keyLabel(lookup.advice.recordingKey)}</b>이에요. 원곡 음원과 같이 치려면 코드를 옮기세요.
+                </p>
+                <button className="btn small" id="move-key" onClick={moveToRecordingKey}>
+                  코드를 원곡 키로 옮기기
+                </button>
+              </div>
+            )}
+            {lookup.meta.beatsPerChord && allChords.length > 0 && chordBeats !== lookup.meta.beatsPerChord && (
+              <div className="row gap wrap center-y">
+                <p className="small">
+                  이 노래는 보통 코드 하나가 <b>{{ 2: '2박', 4: '1마디', 8: '2마디' }[lookup.meta.beatsPerChord]}</b>쯤 가요.
+                </p>
+                <button className="btn ghost small" onClick={() => respace(lookup.meta.beatsPerChord!)}>
+                  코드 길이 맞추기
+                </button>
+              </div>
+            )}
+            {lookup.meta.sources.length > 0 && (
+              <p className="small muted">
+                출처:{' '}
+                {lookup.meta.sources.map((src, i) => (
+                  <span key={src.url}>
+                    {i > 0 && ' · '}
+                    <a href={src.url} target="_blank" rel="noreferrer">
+                      {src.title}
+                    </a>
+                  </span>
+                ))}
+              </p>
+            )}
+            {lookup.meta.via === 'knowledge' && <p className="small muted">웹 검색 없이 Claude가 알고 있는 정보로 답했어요. 틀릴 수 있으니 음원과 같이 들어 보세요.</p>}
+          </div>
+        )}
+      </div>
+
       <div className="form-grid">
         <label className="field">
           <span>조성{guessKey && guessKey !== key ? ` (코드로 보면 ${guessKey} 같아요)` : ''}</span>
-          <select value={key} onChange={(e) => setKey(e.target.value)}>
+          <select id="song-key" value={key} onChange={(e) => setKey(e.target.value)}>
             {[...MAJOR_KEYS, ...MINOR_KEYS].map((k) => (
               <option key={k} value={k}>
                 {keyLabel(k)}
@@ -246,11 +432,14 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         </label>
         <label className="field">
           <span>BPM</span>
-          <input type="number" min={40} max={220} value={bpm} onChange={(e) => setBpm(+e.target.value)} />
+          <div className="row gap">
+            <input id="song-bpm" type="number" min={40} max={220} value={bpm} onChange={(e) => setBpm(+e.target.value)} />
+            <TapTempo onBpm={setBpm} />
+          </div>
         </label>
         <label className="field">
           <span>장르</span>
-          <select value={genre} onChange={(e) => setGenre(e.target.value as GenreId)}>
+          <select id="song-genre" value={genre} onChange={(e) => setGenre(e.target.value as GenreId)}>
             {GENRES.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -258,9 +447,22 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
             ))}
           </select>
         </label>
+        {subtypes && (
+          <label className="field">
+            <span>세부 장르</span>
+            <select value={subtype ?? ''} onChange={(e) => setSubtype(e.target.value || undefined)}>
+              <option value="">선택 안 함</option>
+              {subtypes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           <span>반주 리듬</span>
-          <select value={rhythm} onChange={(e) => setRhythm(e.target.value)}>
+          <select id="song-rhythm" value={rhythm} onChange={(e) => setRhythm(e.target.value)}>
             {RHYTHMS.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -275,6 +477,17 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         </span>
         <textarea id="song-chords" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'벌스: C G | Am F\n후렴: F G | Em Am'} />
       </label>
+      {allChords.length > 0 && (
+        <div className="row gap wrap center-y chord-length">
+          <span className="small muted">코드 하나의 길이를 한 번에:</span>
+          {([2, 4, 8] as const).map((b) => (
+            <button key={b} className={`btn ghost small${chordBeats === b ? ' on' : ''}`} onClick={() => respace(b)}>
+              {{ 2: '2박 (한 마디에 2개)', 4: '1마디', 8: '2마디' }[b]}
+            </button>
+          ))}
+          <span className="small muted">— 연주가 노래보다 빨리 넘어가면 길게, 늦으면 짧게</span>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="row gap">
         <button className="btn" onClick={submit}>

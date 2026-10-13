@@ -2,6 +2,7 @@ import { Chord, Interval } from 'tonal';
 import { estimateKeyFromChords } from './key';
 import { transposeChord } from './keys';
 import { splitSlash } from './notes';
+import { parseBars } from './roman';
 
 export interface SheetSection {
   name: string;
@@ -153,4 +154,28 @@ export function toBarText(chords: string[], perBar = 1): string {
 
 export function isKnownChord(symbol: string): boolean {
   return !Chord.get(splitSlash(symbol)[0]).empty;
+}
+
+/**
+ * Re-spaces a section's chords so every chord lasts the same number of
+ * beats (2 = two per bar, 4 = one bar, 8 = two bars). Pasted chord sheets
+ * carry no timing, so this is how a song is lined up with the recording.
+ */
+export function respaceChords(chords: string, beats: 2 | 4 | 8): string {
+  const syms = parseBars(chords).map((c) => c.symbol);
+  if (beats === 8) return syms.map((s) => `${s}:8`).join(' | ');
+  return toBarText(syms, beats === 2 ? 2 : 1);
+}
+
+/** Beats each chord lasts when they all share one length, else undefined. */
+export function uniformChordBeats(chords: string): number | undefined {
+  const evs = parseBars(chords);
+  if (!evs.length) return undefined;
+  const b = evs[0].beats;
+  return evs.every((e) => Math.abs(e.beats - b) < 1e-6) ? b : undefined;
+}
+
+/** Transposes a bar string ("C G:2 | Am/E F") by an interval, keeping lengths and bar lines. */
+export function transposeBarText(chords: string, ivl: string): string {
+  return chords.replace(/[A-G][#b]?[^\s|:]*/g, (sym) => transposeChord(sym, ivl));
 }

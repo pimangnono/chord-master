@@ -7,6 +7,7 @@ const LIBS = [
   ['React Router', 'MIT', '페이지 이동', 'https://reactrouter.com'],
   ['Zustand', 'MIT', '상태 관리·로컬 저장', 'https://github.com/pmndrs/zustand'],
   ['Vite', 'MIT', '개발 서버·빌드', 'https://vitejs.dev'],
+  ['Anthropic TypeScript SDK', 'MIT', '노래 정보 자동 찾기 (Claude API · 내 API 키 사용)', 'https://github.com/anthropics/anthropic-sdk-typescript'],
 ];
 
 export function AboutPage() {

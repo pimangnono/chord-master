@@ -2704,3 +2704,80 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* ───────── song auto-fill ───────── */
+.lookup-box {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
+  margin-bottom: 10px;
+}
+
+.center-y {
+  align-items: center;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.api-key-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.api-key-box input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.lookup-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.lookup-result p {
+  margin: 0;
+}
+
+.tag.conf-high {
+  --accent: var(--good);
+}
+
+.tag.conf-medium {
+  --accent: var(--S);
+}
+
+.tag.conf-low {
+  --accent: var(--warn);
+}
+
+.warn-text {
+  color: var(--warn);
+}
+
+.chord-length {
+  margin: -4px 0 10px;
+}
+
+.chord-length .btn.on {
+  border-color: var(--brand);
+  color: var(--text);
+  background: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+.tap-btn {
+  white-space: nowrap;
+  touch-action: manipulation;
+  user-select: none;
+}
