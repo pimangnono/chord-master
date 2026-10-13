@@ -2574,6 +2574,11 @@ textarea {
 
 .follow-bar.on {
   border-color: #ff3b48;
+  /* the controls stay pinned while the sheet scrolls under them */
+  position: sticky;
+  top: 8px;
+  z-index: 6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .follow-bar p {

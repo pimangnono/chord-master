@@ -71,13 +71,17 @@ export interface SheetMusicProps {
   /** wait-mode practice highlighting */
   follow?: FollowView;
   onChordClick?: (index: number) => void;
+  /** turn the page for the player: keep the line being played near the top of the window */
+  autoScroll?: boolean;
+  /** px covered at the top of the window (e.g. a sticky control bar) */
+  scrollOffset?: () => number;
 }
 
 const LINE_H = 250;
 const TREBLE_Y = 30;
 const BASS_Y = 125;
 
-export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', follow, onChordClick }: SheetMusicProps) {
+export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', follow, onChordClick, autoScroll = false, scrollOffset }: SheetMusicProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -247,7 +251,6 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
 
   const activeBar = activeBeat !== undefined && activeBeat >= 0 ? Math.floor(activeBeat / 4) : -1;
   const box = boxes[activeBar];
-  const cursorRef = useRef<HTMLDivElement>(null);
 
   // 따라치기: colour the noteheads themselves (red = play now, orange = coming up, green = played)
   useEffect(() => {
@@ -269,14 +272,29 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
       h.el.classList.toggle('fol-past', state === 'past');
     }
   }, [hits, follow]);
-  // keep the practised bar on screen
+  // Page turning: when the music moves to a new line, scroll so that line sits
+  // just under whatever is pinned at the top, with the next lines visible below.
+  // A sheet that fits on screen is only brought fully into view.
+  const lineTop = box?.y;
   useEffect(() => {
-    if (follow?.cur !== null && follow?.cur !== undefined) cursorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [activeBar, follow?.cur]);
+    if (!autoScroll || lineTop === undefined || !wrap.current) return;
+    const top = (scrollOffset?.() ?? 0) + 8;
+    const sheet = wrap.current.getBoundingClientRect();
+    const room = window.innerHeight - top;
+    let target: number;
+    if (sheet.height <= room) {
+      if (sheet.top >= top && sheet.bottom <= window.innerHeight) return;
+      target = sheet.top - top;
+    } else {
+      target = sheet.top + lineTop - top;
+    }
+    if (Math.abs(target) < 4) return;
+    window.scrollTo({ top: window.scrollY + target, behavior: 'smooth' });
+  }, [lineTop, autoScroll, scrollOffset]);
 
   return (
     <div className="sheet" ref={wrap}>
-      {box && <div ref={cursorRef} className="sheet-cursor" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
+      {box && <div className="sheet-cursor" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
       <div ref={host} className="sheet-host" />
       {marks.map((m, i) => (
         <button key={i} className="sheet-chord" style={{ left: m.x - 4, top: m.y }} onClick={() => onChordClick?.(m.chord)}>

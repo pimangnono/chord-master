@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Note } from 'tonal';
 import { player, playNotes } from '../audio/engine';
 import { startPlayback, stopPlayback, useAudioStatus, usePlayback } from '../audio/playback';
@@ -103,6 +103,16 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
   const [hands, setHands] = useState<Hands>('rh');
   const [octaveFree, setOctaveFree] = useState(false);
   const [showKeys, setShowKeys] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const followBarRef = useRef<HTMLDivElement>(null);
+  // while following, the control bar is pinned to the top of the window; the sheet scrolls beneath it
+  const followBarBottom = useCallback(() => {
+    const el = followBarRef.current;
+    if (!el) return 0;
+    const css = getComputedStyle(el);
+    // where the bar ends once pinned (it may still be in the page flow when this is asked)
+    return css.position === 'sticky' ? (parseFloat(css.top) || 0) + el.offsetHeight : 0;
+  }, []);
   const sheetRhythm = view === 'accomp' ? rhythm : getRhythm('whole');
   const followSteps = useMemo(() => buildFollowSteps(buildArrangement(keyed, sheetRhythm, voicingMode), hands), [keyed, sheetRhythm, voicingMode, hands]);
   const follow = useFollow(followSteps, bpm, octaveFree);
@@ -343,7 +353,7 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
           </div>
         </div>
         <p className="muted small">음표에 마우스를 올리면 계이름(고정도·이동도)과 코드 속 역할이 보여요. 클릭하면 소리가 나요.</p>
-        <div className={`follow-bar${follow.active ? ' on' : ''}`}>
+        <div ref={followBarRef} className={`follow-bar${follow.active ? ' on' : ''}`}>
           <div className="follow-controls">
             <b>🎹 따라치기</b>
             {follow.active ? (
@@ -379,6 +389,9 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
             </label>
             <label className="inline-check small">
               <input type="checkbox" checked={showKeys} onChange={(e) => setShowKeys(e.target.checked)} /> 건반에 정답 표시
+            </label>
+            <label className="inline-check small" title="연주하는 줄이 바뀌면 악보를 자동으로 넘겨요 (재생할 때도)">
+              <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} /> 자동 스크롤
             </label>
             {midiStatus !== 'on' && midiStatus !== 'unsupported' && (
               <button className="btn small ghost" onClick={() => connectMidiHub(true)}>
@@ -420,6 +433,8 @@ export function ProgressionStudio({ owner, title, chords: inputChords, baseKey: 
           voicing={voicingMode}
           activeBeat={follow.active && follow.current ? follow.current.t16 / 4 : isPlaying ? playback.beat : undefined}
           follow={follow.active || follow.result ? { cur: follow.current?.t16 ?? null, due: follow.isDue, done: follow.done, hands, guide } : undefined}
+          autoScroll={autoScroll && (follow.active || isPlaying)}
+          scrollOffset={followBarBottom}
           onChordClick={(i) => {
             setSelected(i);
             playNotes([voicings[i].bass, ...voicings[i].rh], 1.6);
