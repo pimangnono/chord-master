@@ -2726,16 +2726,6 @@ textarea {
   font: inherit;
 }
 
-.api-key-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.api-key-box input {
-  flex: 1;
-  min-width: 200px;
-}
 
 .lookup-result {
   display: flex;
@@ -2782,6 +2772,3 @@ textarea {
   user-select: none;
 }
 
-.secret-input {
-  -webkit-text-security: disc;
-}

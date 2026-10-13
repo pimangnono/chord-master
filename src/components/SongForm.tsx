@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chord } from 'tonal';
 import { useNavigate } from 'react-router-dom';
 import { analyzeSamples, ANALYSIS_RATE, decodeAudioFile } from '../audio/songAnalysis';
@@ -11,7 +11,7 @@ import { prettyChord, splitSlash } from '../theory/notes';
 import { parseBars } from '../theory/roman';
 import { parseChordSheet, respaceChords, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
 import { useStore } from '../store';
-import { getApiKey, LOOKUP_NEEDS_KEY, LookupError, LookupResult, lookupSongMeta, setApiKey } from '../ai/songLookup';
+import { LookupError, LookupMode, lookupMode, LookupResult, lookupSongMeta } from '../ai/songLookup';
 import { keyAdvice, KeyAdvice, keyShift } from '../ai/songMeta';
 import { TapTempo } from './TapTempo';
 
@@ -109,9 +109,14 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const respace = (beats: 2 | 4 | 8) => setText(sections.map((s) => `${s.name}: ${respaceChords(s.chords, beats)}`).join('\n'));
 
   // ── auto-fill (Claude) ──
-  const [hasKey, setHasKey] = useState(() => !!getApiKey());
-  const [keyDraft, setKeyDraft] = useState('');
-  const [editKey, setEditKey] = useState(false);
+  const [mode, setMode] = useState<LookupMode | null>(null);
+  useEffect(() => {
+    let live = true;
+    lookupMode().then((m) => live && setMode(m));
+    return () => {
+      live = false;
+    };
+  }, []);
   const [looking, setLooking] = useState(false);
   const [lookup, setLookup] = useState<{ meta: LookupResult; advice: KeyAdvice } | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
@@ -137,7 +142,6 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
       setLookup({ meta, advice });
     } catch (e) {
       if (e instanceof LookupError) {
-        if (e.code === 'bad_key' || e.code === 'no_key') setEditKey(true);
         if (e.code !== 'cancelled') setLookupError(e.message);
       } else setLookupError('찾는 중 오류가 났어요.');
     } finally {
@@ -153,15 +157,6 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
     setText(sections.map((s) => `${s.name}: ${transposeBarText(s.chords, ivl)}`).join('\n'));
     setKey(recordingKey);
     setLookup({ ...lookup, advice: { kind: 'use', key: recordingKey } });
-  };
-
-  const saveKey = () => {
-    if (!keyDraft.trim()) return;
-    setApiKey(keyDraft.trim());
-    setKeyDraft('');
-    setHasKey(true);
-    setEditKey(false);
-    setLookupError(null);
   };
 
   const submit = () => {
@@ -301,7 +296,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
 
       <div className="import-box lookup-box">
         <div className="row gap wrap center-y">
-          <button className="btn" id="song-lookup" disabled={looking || (LOOKUP_NEEDS_KEY && !hasKey)} onClick={runLookup}>
+          <button className="btn" id="song-lookup" disabled={looking || (mode !== 'server' && mode !== 'artifact')} onClick={runLookup}>
             {looking ? '🔎 찾는 중…' : '🔎 장르 · 조성 · BPM · 반주 리듬 자동으로 찾기'}
           </button>
           {looking && (
@@ -309,68 +304,20 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
               취소
             </button>
           )}
-          {LOOKUP_NEEDS_KEY && hasKey && !editKey && !looking && (
-            <button className="link-btn small" onClick={() => setEditKey(true)}>
-              API 키 바꾸기
-            </button>
-          )}
         </div>
         {looking && (
           <p className="muted small">
-            {LOOKUP_NEEDS_KEY ? 'Claude가 웹에서 BPM·조성 정보를 찾고 있어요. 20초~1분쯤 걸려요.' : 'Claude에게 이 노래의 BPM·조성을 물어보고 있어요.'}
+            {mode === 'server' ? 'Claude가 웹에서 BPM·조성 정보를 찾고 있어요. 20초~1분쯤 걸려요.' : 'Claude에게 이 노래의 BPM·조성을 물어보고 있어요.'}
           </p>
         )}
-        {!looking && !lookup && !lookupError && (!LOOKUP_NEEDS_KEY || hasKey) && (
-          <p className="muted small">제목과 아티스트{allChords.length ? ', 넣은 코드' : ''}를 보고 Claude가 {LOOKUP_NEEDS_KEY ? '웹 검색으로 ' : ''}찾아 아래 칸을 채워요. 코드를 먼저 넣으면 코드 키가 원곡과 같은지도 알려줘요.</p>
+        {!looking && !lookup && !lookupError && (mode === 'server' || mode === 'artifact') && (
+          <p className="muted small">제목과 아티스트{allChords.length ? ', 넣은 코드' : ''}를 보고 Claude가 {mode === 'server' ? '웹 검색으로 ' : ''}찾아 아래 칸을 채워요. 코드를 먼저 넣으면 코드 키가 원곡과 같은지도 알려줘요.</p>
         )}
-        {LOOKUP_NEEDS_KEY && (!hasKey || editKey) && (
-          <div className="api-key-box">
-            <p className="small">
-              자동 찾기는 <b>Anthropic API 키</b>로 Claude의 웹 검색을 써요.{' '}
-              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
-                console.anthropic.com
-              </a>
-              에서 키를 만들어 붙여넣으세요. 키는 <b>어디에도 저장하지 않고</b> 이 페이지를 열어 둔 동안만 기억해요(새로고침하거나 탭을 닫으면 다시 넣어야 해요). Anthropic 서버로만 보내요. 한 번 찾을 때 몇십 원 정도 들어요.
-            </p>
-            <div className="row gap wrap">
-              <input
-                id="api-key"
-                // a text field drawn as dots, so password managers don't offer to save the key
-                type="text"
-                className="secret-input"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                data-1p-ignore
-                data-lpignore="true"
-                data-form-type="other"
-                placeholder="sk-ant-..."
-                value={keyDraft}
-                onChange={(e) => setKeyDraft(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && saveKey()}
-              />
-              <button className="btn small" onClick={saveKey} disabled={!keyDraft.trim()}>
-                키 저장
-              </button>
-              {hasKey && (
-                <>
-                  <button className="btn ghost small" onClick={() => setEditKey(false)}>
-                    닫기
-                  </button>
-                  <button
-                    className="btn ghost small"
-                    onClick={() => {
-                      setApiKey('');
-                      setHasKey(false);
-                    }}
-                  >
-                    키 지우기
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+        {mode === 'none' && (
+          <p className="small muted" id="lookup-setup">
+            자동 찾기는 <b>내 컴퓨터에서 실행할 때</b> 써요. 프로젝트 폴더의 <code>.env</code> 파일에 <code>ANTHROPIC_API_KEY=sk-ant-...</code>를 넣고{' '}
+            <code>npm run dev</code>로 열면 돼요. 키는 내 컴퓨터의 서버만 읽고 브라우저로는 절대 보내지 않아요. 그 전엔 아래 👆 박자 탭과 코드 길이 버튼으로 맞춰 주세요.
+          </p>
         )}
         {lookupError && <p className="error">{lookupError}</p>}
         {lookup && (

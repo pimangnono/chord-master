@@ -208,3 +208,18 @@ export function keyShift(from: string, to: string): string {
   if (d > 6) d -= 12;
   return Interval.fromSemitones(d) || '1P';
 }
+
+export type LookupErrorCode = 'no_key' | 'bad_key' | 'rate_limited' | 'network' | 'refused' | 'no_answer' | 'cancelled' | 'unavailable';
+
+export class LookupError extends Error {
+  constructor(
+    message: string,
+    readonly code: LookupErrorCode,
+  ) {
+    super(message);
+  }
+}
+
+export interface LookupResult extends SongMeta {
+  via: 'web' | 'knowledge';
+}
