@@ -31,7 +31,7 @@ export function SyncToRecording({ sections, bpm, songKey, lyrics, onApply, block
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ sync: SectionSync; source: string; before: { text: string; bpm: number; key: string; lyrics: string[][] } } | null>(null);
+  const [done, setDone] = useState<{ sync: SectionSync; source: string; before: { text: string; bpm: number; key: string; lyrics: string[][] }; duration: number } | null>(null);
   const cache = useRef<{ source: string; features: BeatFeatures } | null>(null);
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -70,7 +70,7 @@ export function SyncToRecording({ sections, bpm, songKey, lyrics, onApply, block
       const key = sync.shift ? (normalizeKeyName(transposeChord(songKey, Interval.fromSemitones(sync.shift))) ?? songKey) : songKey;
       const words = sections.map((s, i) => (lyrics[i]?.length ? mergeRepeatLyrics(s.chords, lyrics[i]) : []));
       onApply(sync.sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), sync.alignment.bpm, key, words);
-      setDone({ sync, source, before });
+      setDone({ sync, source, before, duration: features.duration });
     } catch (e) {
       if (!ctl.signal.aborted) setError(e instanceof Error ? e.message : '맞추지 못했어요.');
     } finally {
@@ -156,6 +156,11 @@ export function SyncToRecording({ sections, bpm, songKey, lyrics, onApply, block
           {done.sync.shift !== 0 && (
             <p className="small warn-text">
               악보가 원곡보다 {Math.abs(done.sync.shift)}반음 {done.sync.shift > 0 ? '낮게' : '높게'} 적혀 있어서 원곡 키({keyLabel(normalizeKeyName(transposeChord(done.before.key, Interval.fromSemitones(done.sync.shift))) ?? done.before.key)})로 옮겼어요.
+            </p>
+          )}
+          {done.duration - a.end > 8 && (
+            <p className="small warn-text">
+              악보는 원곡 <b>{clock(a.end)}</b>에서 끝나요. 그 뒤({clock(a.end)}~{clock(done.duration)})는 악보에 없는 부분이에요 — 간주나 반복 후렴이 빠졌다면 악보에 더해 주세요.
             </p>
           )}
           {a.fit <= 0.3 && <p className="small warn-text">음원과 코드가 잘 안 맞아요. 다른 버전(라이브·커버)의 음원이거나 악보 코드 순서가 다를 수 있어요.</p>}

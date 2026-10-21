@@ -153,18 +153,37 @@ export function trackBeats(flux: Float32Array, frameRate: number): { period: num
       period = p;
     }
   }
-  let phase = 0;
-  let phaseScore = -Infinity;
-  for (let ph = 0; ph < period; ph += 0.5) {
-    let s = 0;
-    for (let t = ph; t < n; t += period) s += env[Math.round(t)] ?? 0;
-    if (s > phaseScore) {
-      phaseScore = s;
-      phase = ph;
+  // Beat placement by dynamic programming (Ellis 2007): each beat is an onset
+  // peak, and the gap to the previous beat may stretch or shrink a little
+  // around the period, so beats follow a recording whose tempo drifts.
+  let sd = 0;
+  for (const v of env) sd += v * v;
+  sd = Math.sqrt(sd / Math.max(1, n)) || 1;
+  const strength = Float32Array.from(env, (v) => v / sd);
+  const TIGHTNESS = 60;
+  const score = new Float64Array(n);
+  const back = new Int32Array(n).fill(-1);
+  const lo = Math.max(1, Math.round(period * 0.6));
+  const hi = Math.round(period * 1.6);
+  for (let t = 0; t < n; t++) {
+    let best = 0;
+    let arg = -1;
+    for (let d = lo; d <= hi && d <= t; d++) {
+      const dev = Math.log(d / period);
+      const v = score[t - d] - TIGHTNESS * dev * dev;
+      if (arg < 0 || v > best) (best = v), (arg = t - d);
     }
+    score[t] = strength[t] + (arg >= 0 ? Math.max(0, best) : 0);
+    back[t] = arg >= 0 && best > 0 ? arg : -1;
   }
+  // end on the best-scoring frame within the last beat period
+  let end = n - 1;
+  for (let t = Math.max(0, n - Math.ceil(period)); t < n; t++) if (score[t] > score[end]) end = t;
   const beats: number[] = [];
-  for (let t = phase; t < n; t += period) beats.push(Math.round(t));
+  for (let t = end; t >= 0; t = back[t]) beats.unshift(t);
+  // extend the grid before the first tracked beat (quiet intros)
+  while (beats[0] - period >= 0) beats.unshift(Math.round(beats[0] - period));
+  if (beats.length > 1) period = (beats[beats.length - 1] - beats[0]) / (beats.length - 1);
   return { period, beats, bpm: Math.round((60 * frameRate) / period) };
 }
 

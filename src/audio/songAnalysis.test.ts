@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Chord, Note } from 'tonal';
-import { analyzeSamples, ANALYSIS_RATE } from './songAnalysis';
+import { analyzeSamples, ANALYSIS_RATE, trackBeats } from './songAnalysis';
 
 const SR = ANALYSIS_RATE;
 let seed = 7;
@@ -52,6 +52,26 @@ function song(progression: string[], bpm: number, repeats: number) {
   }
   return x;
 }
+
+describe('beat tracking', () => {
+  it('follows a tempo that drifts (no click track)', () => {
+    const fps = ANALYSIS_RATE / 1024;
+    const flux = new Float32Array(Math.round(fps * 120));
+    const truth: number[] = [];
+    // 76 BPM swaying ±5% over every 48 beats, with a little noise
+    for (let k = 0, t = 0.5; t < 119; k++) {
+      truth.push(Math.round(t * fps));
+      t += (60 / 76) * (1 + 0.05 * Math.sin((2 * Math.PI * k) / 48));
+    }
+    for (const f of truth) flux[f] += 1;
+    for (let i = 0; i < flux.length; i++) flux[i] += 0.15 * ((i * 7919) % 13) / 13;
+    const { beats, bpm } = trackBeats(flux, fps);
+    expect(Math.abs(bpm - 76)).toBeLessThan(3);
+    // every true beat has a tracked beat within one frame (~46 ms)
+    const missed = truth.filter((f) => !beats.some((b) => Math.abs(b - f) <= 1));
+    expect(missed.length).toBe(0);
+  });
+});
 
 describe('song chord analysis (synthetic band)', () => {
   it('recovers a pop progression, key and tempo', async () => {
