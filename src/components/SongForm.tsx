@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chord } from 'tonal';
 import { useNavigate } from 'react-router-dom';
 import { analyzeSamples, ANALYSIS_RATE, decodeAudioFile } from '../audio/songAnalysis';
-import { fetchYoutubeAudio, looksLikeYoutube, youtubeAvailable } from '../audio/youtube';
+import { fetchYoutubeAudio, looksLikeYoutube, YOUTUBE_HELP, YoutubeStatus, youtubeStatus } from '../audio/youtube';
 import { GENRES, GenreId } from '../data/progressions';
 import { RHYTHMS } from '../data/rhythms';
 import type { Song } from '../data/songs';
@@ -83,12 +83,12 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
     fill(parsed.sections.map((s) => `${s.name}: ${bars(s)}`).join('\n'), parsed.key, '붙여넣은 코드 악보');
   };
 
-  const [ytOk, setYtOk] = useState(false);
+  const [ytStatus, setYtStatus] = useState<YoutubeStatus | null>(null);
   const [ytUrl, setYtUrl] = useState('');
   const [ytBytes, setYtBytes] = useState<number | null>(null);
   useEffect(() => {
     let live = true;
-    youtubeAvailable().then((v) => live && setYtOk(v));
+    youtubeStatus().then((v) => live && setYtStatus(v));
     return () => {
       live = false;
     };
@@ -319,21 +319,18 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
               {progress !== null ? `분석 중… ${Math.round(progress * 100)}%` : '🎧 음원 파일 선택'}
             </button>
             <input ref={fileRef} type="file" accept="audio/*" hidden onChange={(e) => e.target.files?.[0] && analyzeFile(e.target.files[0])} />
-            {ytOk && (
-              <>
-                <span className="muted small">또는</span>
-                <input className="grow-input" placeholder="유튜브 링크" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} />
-                <button className="btn ghost" disabled={progress !== null || ytBytes !== null || !ytUrl.trim()} onClick={analyzeYoutube}>
-                  {ytBytes !== null ? `받는 중… ${(ytBytes / 1048576).toFixed(1)}MB` : '유튜브로 분석'}
-                </button>
-              </>
-            )}
+            <span className="muted small">또는</span>
+            <input className="grow-input" placeholder="유튜브 링크" value={ytUrl} disabled={ytStatus !== 'ok'} onChange={(e) => setYtUrl(e.target.value)} />
+            <button className="btn ghost" disabled={ytStatus !== 'ok' || progress !== null || ytBytes !== null || !ytUrl.trim()} onClick={analyzeYoutube}>
+              {ytBytes !== null ? `받는 중… ${(ytBytes / 1048576).toFixed(1)}MB` : '유튜브로 분석'}
+            </button>
             {progress !== null && (
               <div className="meter wide">
                 <div style={{ width: `${Math.round(progress * 100)}%` }} />
               </div>
             )}
           </div>
+          {ytStatus && ytStatus !== 'ok' && <p className="small warn-text">{YOUTUBE_HELP[ytStatus]}</p>}
           {audioNote && <p className="muted small">{audioNote}</p>}
         </div>
       )}
@@ -487,18 +484,17 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
           <span className="small muted">— 연주가 노래보다 빨리 넘어가면 길게, 늦으면 짧게</span>
         </div>
       )}
-      {allChords.length > 0 && !bad.length && (
-        <SyncToRecording
-          sections={sections}
-          bpm={bpm}
-          songKey={key}
-          onApply={(t, b, k) => {
-            setText(t);
-            setBpm(Math.min(220, Math.max(40, b)));
-            setKey(k);
-          }}
-        />
-      )}
+      <SyncToRecording
+        blocked={!allChords.length ? '먼저 위에서 코드 악보를 붙여넣거나 코드를 입력해 주세요.' : bad.length ? `알 수 없는 코드(${bad.join(', ')})를 먼저 고쳐 주세요.` : undefined}
+        sections={sections}
+        bpm={bpm}
+        songKey={key}
+        onApply={(t, b, k) => {
+          setText(t);
+          setBpm(Math.min(220, Math.max(40, b)));
+          setKey(k);
+        }}
+      />
       {error && <p className="error">{error}</p>}
       <div className="row gap">
         <button className="btn" onClick={submit}>

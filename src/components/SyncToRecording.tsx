@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Interval } from 'tonal';
 import { syncSections, SectionSync } from '../audio/align';
 import { ANALYSIS_RATE, beatFeatures, BeatFeatures, decodeAudioFile } from '../audio/songAnalysis';
-import { fetchYoutubeAudio, looksLikeYoutube, youtubeAvailable } from '../audio/youtube';
+import { fetchYoutubeAudio, looksLikeYoutube, YOUTUBE_HELP, YoutubeStatus, youtubeStatus } from '../audio/youtube';
 import { normalizeKeyName } from '../ai/songMeta';
 import { keyLabel, transposeChord } from '../theory/keys';
 
@@ -12,6 +12,8 @@ interface Props {
   bpm: number;
   songKey: string;
   onApply: (text: string, bpm: number, key: string) => void;
+  /** why syncing can't start yet (no chords, unknown chords) */
+  blocked?: string;
 }
 
 const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -21,8 +23,8 @@ const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60))
  * the local yt-dlp, or an audio file): the chord order comes from the sheet,
  * the length of each chord from the recording.
  */
-export function SyncToRecording({ sections, bpm, songKey, onApply }: Props) {
-  const [yt, setYt] = useState(false);
+export function SyncToRecording({ sections, bpm, songKey, onApply, blocked }: Props) {
+  const [yt, setYt] = useState<YoutubeStatus | null>(null);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function SyncToRecording({ sections, bpm, songKey, onApply }: Props) {
 
   useEffect(() => {
     let live = true;
-    youtubeAvailable().then((v) => live && setYt(v));
+    youtubeStatus().then((v) => live && setYt(v));
     return () => {
       live = false;
       abort.current?.abort();
@@ -73,7 +75,13 @@ export function SyncToRecording({ sections, bpm, songKey, onApply }: Props) {
     }
   };
 
+  const recheck = () => {
+    setYt(null);
+    youtubeStatus().then(setYt);
+  };
+
   const fromYoutube = () => {
+    if (yt !== 'ok' || blocked) return;
     if (!looksLikeYoutube(url)) return setError('유튜브 영상 링크를 넣어 주세요 (youtube.com/watch?v=… 또는 youtu.be/…).');
     setBusy('유튜브에서 음원 받는 중…');
     run(`yt:${url.trim()}`, (signal) => fetchYoutubeAudio(url, signal, (n) => setBusy(`유튜브에서 음원 받는 중… ${(n / 1048576).toFixed(1)}MB`)));
@@ -86,23 +94,20 @@ export function SyncToRecording({ sections, bpm, songKey, onApply }: Props) {
         <b>🎧 원곡에 박자 맞추기</b> — 코드 순서는 위 악보 그대로 두고, 원곡을 들어서 코드마다 몇 박인지 맞춰요. 악보 키가 원곡과 다르면 원곡 키로 옮겨요.
       </p>
       <div className="row gap wrap center-y">
-        {yt && (
-          <>
-            <input
-              id="sync-url"
-              className="grow-input"
-              placeholder="유튜브 링크 (https://youtu.be/…)"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !busy && fromYoutube()}
-            />
-            <button className="btn" id="sync-youtube" disabled={!!busy || !url.trim()} onClick={fromYoutube}>
-              유튜브로 맞추기
-            </button>
-          </>
-        )}
-        <button className={`btn${yt ? ' ghost' : ''}`} disabled={!!busy} onClick={() => fileRef.current?.click()}>
-          {yt ? '음원 파일로' : '🎧 음원 파일로 맞추기'}
+        <input
+          id="sync-url"
+          className="grow-input"
+          placeholder="유튜브 링크 (https://youtu.be/…)"
+          value={url}
+          disabled={yt !== 'ok'}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !busy && fromYoutube()}
+        />
+        <button className="btn" id="sync-youtube" disabled={yt !== 'ok' || !!busy || !!blocked || !url.trim()} onClick={fromYoutube}>
+          유튜브로 맞추기
+        </button>
+        <button className="btn ghost" disabled={!!busy || !!blocked} onClick={() => fileRef.current?.click()}>
+          음원 파일로
         </button>
         <input
           ref={fileRef}
@@ -124,11 +129,18 @@ export function SyncToRecording({ sections, bpm, songKey, onApply }: Props) {
           </button>
         )}
       </div>
-      {!yt && import.meta.env.MODE !== 'artifact' && (
-        <p className="muted small">
-          유튜브 링크로 맞추려면 내 컴퓨터에서 <code>npm run dev</code>로 열고 yt-dlp를 설치하세요 (<code>brew install yt-dlp</code>).
+      {yt === null && <p className="muted small">유튜브 링크를 쓸 수 있는지 확인하는 중…</p>}
+      {yt && yt !== 'ok' && (
+        <p className="small warn-text" id="sync-yt-help">
+          {YOUTUBE_HELP[yt]}{' '}
+          {yt === 'no-ytdlp' && (
+            <button className="link-btn small" onClick={recheck}>
+              다시 확인
+            </button>
+          )}
         </p>
       )}
+      {blocked && <p className="muted small">{blocked}</p>}
       {busy && <p className="muted small">{busy}</p>}
       {error && <p className="error">{error}</p>}
       {done && a && (

@@ -6,16 +6,30 @@
 const ENDPOINT = `${import.meta.env.BASE_URL}api/youtube-audio`;
 const HEADERS = { 'x-chord-master': '1' };
 
-let available: Promise<boolean> | null = null;
+/**
+ * - `ok`: local server with yt-dlp
+ * - `no-ytdlp`: local server, but yt-dlp isn't installed (or wasn't found)
+ * - `no-server`: a static copy (GitHub Pages, claude.ai) with no local server
+ */
+export type YoutubeStatus = 'ok' | 'no-ytdlp' | 'no-server';
 
-/** Whether this page runs on the local server with yt-dlp installed (checked once). */
-export function youtubeAvailable(): Promise<boolean> {
-  if (import.meta.env.MODE === 'artifact') return Promise.resolve(false);
-  available ??= fetch(`${ENDPOINT}?check=1`, { headers: HEADERS, cache: 'no-store', signal: AbortSignal.timeout(8000) })
-    .then(async (r) => r.ok && !!((await r.json()) as { available?: boolean }).available)
-    .catch(() => false);
-  return available;
+/** Asks the local server whether YouTube links can be used. Not cached: installing yt-dlp takes effect on the next check. */
+export async function youtubeStatus(): Promise<YoutubeStatus> {
+  if (import.meta.env.MODE === 'artifact') return 'no-server';
+  try {
+    const r = await fetch(`${ENDPOINT}?check=1`, { headers: HEADERS, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) return 'no-server';
+    return ((await r.json()) as { available?: boolean }).available ? 'ok' : 'no-ytdlp';
+  } catch {
+    return 'no-server';
+  }
 }
+
+/** Why a YouTube link can't be used here, for the form. */
+export const YOUTUBE_HELP: Record<Exclude<YoutubeStatus, 'ok'>, string> = {
+  'no-server': '유튜브 링크는 내 컴퓨터에서 npm run dev 로 연 앱에서만 쓸 수 있어요 (이 사이트에는 서버가 없어요). 여기서는 음원 파일로 맞출 수 있어요.',
+  'no-ytdlp': 'yt-dlp가 설치돼 있지 않아요. 터미널에서 brew install yt-dlp 를 실행한 뒤 [다시 확인]을 누르세요.',
+};
 
 export function looksLikeYoutube(url: string): boolean {
   return /^(https?:\/\/)?((www|m|music)\.)?(youtube\.com\/(watch\?|shorts\/)|youtu\.be\/)/i.test(url.trim());

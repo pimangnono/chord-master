@@ -10,8 +10,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  *   GET ?check=1    → { available, version }
  *   GET ?url=<link> → audio bytes (m4a/webm), or { error } JSON
  *
- * yt-dlp must be installed (`brew install yt-dlp`); YTDLP_PATH in .env can
- * point at a specific binary.
+ * yt-dlp must be installed (`brew install yt-dlp` or `pip install yt-dlp`);
+ * it is looked for on PATH, in Homebrew's folders and as a Python module, and
+ * YTDLP_PATH in .env can point at a specific binary.
  */
 
 const MAX_BYTES = 60 * 1024 * 1024;
@@ -32,13 +33,56 @@ export function youtubeVideoUrl(raw: string): string | null {
   return `https://www.youtube.com/watch?v=${id}`;
 }
 
-function run(bin: string, args: string[]) {
-  // arguments go straight to the program — no shell, so nothing in a URL is interpreted
-  return spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+interface Cmd {
+  bin: string;
+  pre: string[];
 }
 
-export function youtubeAudioHandler(ytdlpPath = 'yt-dlp') {
-  return (req: IncomingMessage, res: ServerResponse) => {
+function run(cmd: Cmd, args: string[]) {
+  // arguments go straight to the program — no shell, so nothing in a URL is interpreted
+  return spawn(cmd.bin, [...cmd.pre, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/** Version string if this command is a working yt-dlp, else null. */
+function probe(cmd: Cmd): Promise<string | null> {
+  return new Promise((resolve) => {
+    const p = run(cmd, ['--version']);
+    let out = '';
+    p.stdout.on('data', (d) => (out += d));
+    p.on('error', () => resolve(null));
+    p.on('close', (code) => resolve(code === 0 && out.trim() ? out.trim() : null));
+  });
+}
+
+/**
+ * Finds yt-dlp: YTDLP_PATH, PATH, Homebrew's folders (a server started from
+ * an editor may not have them on PATH), then `python3 -m yt_dlp` for pip
+ * installs. A miss is not remembered, so installing it while the server
+ * runs works on the next try.
+ */
+function locator(custom?: string) {
+  let found: { cmd: Cmd; version: string } | null = null;
+  const candidates: Cmd[] = [
+    ...(custom ? [{ bin: custom, pre: [] }] : []),
+    { bin: 'yt-dlp', pre: [] },
+    { bin: '/opt/homebrew/bin/yt-dlp', pre: [] },
+    { bin: '/usr/local/bin/yt-dlp', pre: [] },
+    { bin: 'python3', pre: ['-m', 'yt_dlp'] },
+    { bin: 'python', pre: ['-m', 'yt_dlp'] },
+  ];
+  return async () => {
+    if (found) return found;
+    for (const cmd of candidates) {
+      const version = await probe(cmd);
+      if (version) return (found = { cmd, version });
+    }
+    return null;
+  };
+}
+
+export function youtubeAudioHandler(ytdlpPath?: string) {
+  const ytdlp = locator(ytdlpPath);
+  return async (req: IncomingMessage, res: ServerResponse) => {
     const json = (status: number, body: unknown) => {
       res.statusCode = status;
       res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -49,19 +93,14 @@ export function youtubeAudioHandler(ytdlpPath = 'yt-dlp') {
     if (req.method !== 'GET' || req.headers['x-chord-master'] !== '1') return json(403, { error: { code: 'forbidden', message: '이 앱에서만 쓸 수 있어요.' } });
 
     const params = new URL(req.url ?? '', 'http://localhost').searchParams;
-    if (params.has('check')) {
-      const p = run(ytdlpPath, ['--version']);
-      let out = '';
-      p.stdout.on('data', (d) => (out += d));
-      p.on('error', () => json(200, { available: false }));
-      p.on('close', (code) => !res.writableEnded && json(200, code === 0 ? { available: true, version: out.trim() } : { available: false }));
-      return;
-    }
+    const found = await ytdlp();
+    if (params.has('check')) return json(200, found ? { available: true, version: found.version } : { available: false });
 
     const url = youtubeVideoUrl(params.get('url') ?? '');
     if (!url) return json(400, { error: { code: 'bad_url', message: '유튜브 영상 링크가 아니에요.' } });
+    if (!found) return json(500, { error: { code: 'no_ytdlp', message: 'yt-dlp를 찾지 못했어요. 터미널에서 brew install yt-dlp 로 설치한 뒤 다시 눌러 주세요.' } });
 
-    const p = run(ytdlpPath, [
+    const p = run(found.cmd, [
       '--no-playlist',
       '--quiet',
       '--no-progress',
