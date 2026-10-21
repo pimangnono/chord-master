@@ -8,6 +8,8 @@ export interface SheetLine {
   chords: string[];
   /** a lyric line sits under these chords (vs. a bare chord line, e.g. an interlude) */
   lyric: boolean;
+  /** the words sung on each chord, when the sheet has lyrics (same length as `chords`) */
+  lyrics?: string[];
 }
 
 export interface SheetSection {
@@ -122,6 +124,81 @@ function chordsInLine(line: string, unknown: string[]): string[] | null {
   return Array.from({ length: Math.min(times, 8) }, () => chords).flat();
 }
 
+/** Display width of a character in a monospaced chord sheet: Hangul and CJK take two columns. */
+function charWidth(ch: string): number {
+  const c = ch.codePointAt(0) ?? 0;
+  return (c >= 0x1100 && c <= 0x115f) || (c >= 0x2e80 && c <= 0xa4cf) || (c >= 0xac00 && c <= 0xd7a3) || (c >= 0xf900 && c <= 0xfaff) || (c >= 0xff00 && c <= 0xff60) || (c >= 0xffe0 && c <= 0xffe6) ? 2 : 1;
+}
+
+/** Column where each chord token starts on a chord line ("C       Em     Am7"). */
+function chordColumns(line: string): number[] {
+  const cols: number[] = [];
+  let col = 0;
+  let i = 0;
+  const chars = [...line];
+  while (i < chars.length) {
+    if (/\s|\|/.test(chars[i])) {
+      col += charWidth(chars[i]);
+      i++;
+      continue;
+    }
+    let tok = '';
+    const start = col;
+    while (i < chars.length && !/\s|\|/.test(chars[i])) {
+      tok += chars[i];
+      col += charWidth(chars[i]);
+      i++;
+    }
+    if (!IGNORABLE.test(tok) && normalizeChord(tok)) cols.push(start);
+  }
+  return cols;
+}
+
+/**
+ * Cuts a lyric line at the chords above it: each chord gets the words from
+ * its column to the next chord's. Cuts snap to the nearest word start when
+ * one is close, since pasted spacing is only approximate.
+ */
+export function splitLyrics(chordLine: string, lyricLine: string): string[] | null {
+  const cols = chordColumns(chordLine);
+  if (!cols.length) return null;
+  const chars = [...lyricLine.replace(/\s+$/, '')];
+  const starts: number[] = [];
+  let col = 0;
+  for (const ch of chars) {
+    starts.push(col);
+    col += charWidth(ch);
+  }
+  const wordStarts = chars.map((_, i) => i).filter((i) => !/\s/.test(chars[i]) && (i === 0 || /\s/.test(chars[i - 1])));
+  const cut = (c: number) => {
+    let k = starts.findIndex((st, i) => st + charWidth(chars[i]) > c);
+    if (k < 0) k = chars.length;
+    let best = -1;
+    for (const w of wordStarts) if (best < 0 || Math.abs(starts[w] - c) < Math.abs(starts[best] - c)) best = w;
+    if (best >= 0 && Math.abs(starts[best] - c) <= 3) k = best;
+    return k;
+  };
+  const idx = cols.map(cut);
+  idx[0] = 0; // words before the first chord (a pickup) go with it
+  for (let i = 1; i < idx.length; i++) idx[i] = Math.max(idx[i], idx[i - 1]);
+  return idx.map((k, i) => chars.slice(k, idx[i + 1] ?? chars.length).join('').trim());
+}
+
+/** Inline ChordPro lyrics: "[C]Let it [G]be" → ["Let it", "be"]. */
+function bracketLyrics(line: string): string[] | null {
+  const parts = line.split(/\[[^\]]+\]/);
+  if (parts.length < 2) return null;
+  const lead = parts[0].trim();
+  const out = parts.slice(1).map((p) => p.trim());
+  if (lead) out[0] = `${lead} ${out[0]}`.trim();
+  return out.some(Boolean) ? out : null;
+}
+
+/** The words for each chord of a section, in order ('' where there are none). */
+export function sectionLyrics(section: SheetSection): string[] {
+  return section.lines.flatMap((l) => l.lyrics ?? l.chords.map(() => ''));
+}
+
 /**
  * Pulls the chord progression out of a pasted chord sheet (chords above
  * lyrics, ChordPro, or bare chord lines). Lyrics are discarded.
@@ -155,8 +232,11 @@ export function parseChordSheet(text: string, applyCapo = true, opts: ParseOptio
       return;
     }
     const next = lines[i + 1];
+    const lyric = !!next && !sectionName(next) && !isChordLine(next) && !KEY_LINE.test(next);
+    let lyrics: string[] | null = bracketLyrics(line);
+    if (!lyrics && lyric) lyrics = splitLyrics(line, next);
     current.chords.push(...chords);
-    current.lines.push({ chords, lyric: !!next && !sectionName(next) && !isChordLine(next) });
+    current.lines.push({ chords, lyric: lyric || !!lyrics, ...(lyrics && lyrics.length === chords.length ? { lyrics } : {}) });
   });
   if (current.chords.length) sections.push(current);
 
@@ -236,4 +316,20 @@ export function uniformChordBeats(chords: string): number | undefined {
 /** Transposes a bar string ("C G:2 | Am/E F") by an interval, keeping lengths and bar lines. */
 export function transposeBarText(chords: string, ivl: string): string {
   return chords.replace(/[A-G][#b]?[^\s|:]*/g, (sym) => transposeChord(sym, ivl));
+}
+
+/**
+ * Lyrics for a section once repeated chords are merged into one (as the
+ * recording sync does): "C C G" with ["a", "b", "c"] → ["a b", "c"].
+ */
+export function mergeRepeatLyrics(chords: string, lyrics: string[]): string[] {
+  const out: string[] = [];
+  let prev = '';
+  parseBars(chords).forEach(({ symbol }, i) => {
+    const w = lyrics[i] ?? '';
+    if (symbol === prev && out.length) out[out.length - 1] = [out[out.length - 1], w].filter(Boolean).join(' ');
+    else out.push(w);
+    prev = symbol;
+  });
+  return out;
 }

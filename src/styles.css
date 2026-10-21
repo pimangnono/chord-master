@@ -1095,6 +1095,24 @@ textarea {
   color: var(--brand2);
 }
 
+.sheet-lyric {
+  position: absolute;
+  font-size: 14px;
+  line-height: 1.2;
+  color: #2b2840;
+  padding: 1px 3px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sheet-lyric.on {
+  background: #ffe2e5;
+  color: #c4121f;
+  font-weight: 700;
+}
+
 .sheet-hit {
   position: absolute;
   height: 12px;
@@ -2787,4 +2805,18 @@ textarea {
   margin-bottom: 10px;
   border-style: solid;
   border-color: color-mix(in srgb, var(--good) 40%, var(--line));
+}
+
+.lyric-preview summary {
+  cursor: pointer;
+}
+
+.lyric-preview .parse-section {
+  margin-top: 6px;
+}
+
+.lyric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
 }

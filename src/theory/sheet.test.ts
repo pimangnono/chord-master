@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linesToBarText, normalizeChord, parseChordSheet, sectionName, toBarText } from './sheet';
+import { linesToBarText, mergeRepeatLyrics, normalizeChord, parseChordSheet, sectionLyrics, sectionName, splitLyrics, toBarText } from './sheet';
 
 describe('chord sheet import', () => {
   it('normalises chord spellings', () => {
@@ -78,6 +78,21 @@ Speaking words of wisdom, let it be`;
     expect(linesToBarText([{ chords: ['Bb', 'A7', 'Dm7', 'Em', 'Am7'], lyric: true }])).toBe('Bb | A7 Dm7 | Em Am7');
     expect(linesToBarText([{ chords: ['G'], lyric: true }])).toBe('G:8');
     expect(linesToBarText([{ chords: ['A', 'A', 'Bm7', 'Dm'], lyric: false }])).toBe('A | A | Bm7 | Dm');
+  });
+
+  it('cuts the lyrics at the chords above them', () => {
+    // Hangul is two columns wide in a chord sheet; cuts snap to word starts
+    expect(splitLyrics('C       Em     Am7', '기쁨 뒤에 슬픔이 오는 건')).toEqual(['기쁨 뒤에', '슬픔이', '오는 건']);
+    expect(splitLyrics('C                G', 'When I find myself in times of trouble')).toEqual(['When I find myself', 'in times of trouble']);
+    // a chord past the end of the words gets none
+    expect(splitLyrics('Dm7    G      Em7     A7       Dm7        G', '아름다운 마음이야')).toEqual(['아름다운', '마음', '이야', '', '', '']);
+    const r = parseChordSheet('[Verse]\nC       Em     Am7\n기쁨 뒤에 슬픔이 오는 건\nF  G\n\n[Chorus]\n[C]Let it [G]be');
+    expect(sectionLyrics(r.sections[0])).toEqual(['기쁨 뒤에', '슬픔이', '오는 건', '', '']);
+    expect(sectionLyrics(r.sections[1])).toEqual(['Let it', 'be']);
+  });
+
+  it('keeps lyrics in step when repeated chords merge', () => {
+    expect(mergeRepeatLyrics('A | A | Bm7 Dm', ['너의', '웃음과', '', '눈물'])).toEqual(['너의 웃음과', '', '눈물']);
   });
 
   it('formats bars', () => {

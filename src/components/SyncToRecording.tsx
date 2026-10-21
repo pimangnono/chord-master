@@ -5,13 +5,16 @@ import { ANALYSIS_RATE, beatFeatures, BeatFeatures, decodeAudioFile } from '../a
 import { fetchYoutubeAudio, looksLikeYoutube, YOUTUBE_HELP, YoutubeStatus, youtubeStatus } from '../audio/youtube';
 import { normalizeKeyName } from '../ai/songMeta';
 import { keyLabel, transposeChord } from '../theory/keys';
+import { mergeRepeatLyrics } from '../theory/sheet';
 
 interface Props {
   /** "이름: 코드" lines, as in the song form */
   sections: { name: string; chords: string }[];
   bpm: number;
   songKey: string;
-  onApply: (text: string, bpm: number, key: string) => void;
+  /** words per chord, per section; kept in step when repeated chords merge */
+  lyrics: string[][];
+  onApply: (text: string, bpm: number, key: string, lyrics: string[][]) => void;
   /** why syncing can't start yet (no chords, unknown chords) */
   blocked?: string;
 }
@@ -23,12 +26,12 @@ const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60))
  * the local yt-dlp, or an audio file): the chord order comes from the sheet,
  * the length of each chord from the recording.
  */
-export function SyncToRecording({ sections, bpm, songKey, onApply, blocked }: Props) {
+export function SyncToRecording({ sections, bpm, songKey, lyrics, onApply, blocked }: Props) {
   const [yt, setYt] = useState<YoutubeStatus | null>(null);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ sync: SectionSync; source: string; before: { text: string; bpm: number; key: string } } | null>(null);
+  const [done, setDone] = useState<{ sync: SectionSync; source: string; before: { text: string; bpm: number; key: string; lyrics: string[][] } } | null>(null);
   const cache = useRef<{ source: string; features: BeatFeatures } | null>(null);
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -63,9 +66,10 @@ export function SyncToRecording({ sections, bpm, songKey, onApply, blocked }: Pr
       await new Promise((r) => setTimeout(r, 0));
       const sync = syncSections(sections, features, bpm);
       if (!sync) throw new Error('코드를 읽지 못했어요. 아래 코드 칸을 확인해 주세요.');
-      const before = { text: sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), bpm, key: songKey };
+      const before = { text: sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), bpm, key: songKey, lyrics };
       const key = sync.shift ? (normalizeKeyName(transposeChord(songKey, Interval.fromSemitones(sync.shift))) ?? songKey) : songKey;
-      onApply(sync.sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), sync.alignment.bpm, key);
+      const words = sections.map((s, i) => (lyrics[i]?.length ? mergeRepeatLyrics(s.chords, lyrics[i]) : []));
+      onApply(sync.sections.map((s) => `${s.name}: ${s.chords}`).join('\n'), sync.alignment.bpm, key, words);
       setDone({ sync, source, before });
     } catch (e) {
       if (!ctl.signal.aborted) setError(e instanceof Error ? e.message : '맞추지 못했어요.');
@@ -160,7 +164,7 @@ export function SyncToRecording({ sections, bpm, songKey, onApply, blocked }: Pr
             <button
               className="btn ghost small"
               onClick={() => {
-                onApply(done.before.text, done.before.bpm, done.before.key);
+                onApply(done.before.text, done.before.bpm, done.before.key, done.before.lyrics);
                 setDone(null);
               }}
             >

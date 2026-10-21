@@ -109,7 +109,7 @@ export function SongPage() {
   const chords = useMemo(() => {
     if (!song) return [];
     const secs = section < 0 ? song.sections : [song.sections[section]];
-    return secs.flatMap((s) => parseBars(s.chords));
+    return secs.flatMap((s) => parseBars(s.chords).map((c, i) => (s.lyrics?.[i] ? { ...c, lyric: s.lyrics[i] } : c)));
   }, [song, section]);
 
   if (!song) {

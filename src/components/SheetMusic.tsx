@@ -80,6 +80,10 @@ export interface SheetMusicProps {
 const LINE_H = 250;
 const TREBLE_Y = 30;
 const BASS_Y = 125;
+/** extra room under each system for a line of lyrics */
+const LYRIC_H = 56;
+/** lyrics sit under the bass staff, clear of its stems and low ledger notes */
+const LYRIC_Y = BASS_Y + 120;
 
 export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smooth', follow, onChordClick, autoScroll = false, scrollOffset }: SheetMusicProps) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -99,6 +103,8 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
     return () => ro.disconnect();
   }, []);
 
+  const hasLyrics = chords.some((c) => c.lyric?.trim());
+  const lineH = LINE_H + (hasLyrics ? LYRIC_H : 0);
   const score = useMemo(() => {
     const arr = buildArrangement(chords, rhythm, voicing);
     return { bars: buildScore(arr, chords), arr };
@@ -114,7 +120,7 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
       const barsPerLine = Math.max(1, Math.min(4, Math.floor((width - 90) / 210)));
       const lines = Math.ceil(bars.length / barsPerLine);
       const renderer = new Renderer(el, Renderer.Backends.SVG);
-      renderer.resize(width, lines * LINE_H);
+      renderer.resize(width, lines * lineH);
       const ctx = renderer.getContext();
       const newHits: Hit[] = [];
       const newMarks: Mark[] = [];
@@ -130,7 +136,7 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
         const first = col === 0;
         const x = 6 + (first ? 0 : extra + col * barW);
         const w = first ? barW + extra : barW;
-        const y = line * LINE_H;
+        const y = line * lineH;
         const treble = new Stave(x, y + TREBLE_Y, w);
         const bass = new Stave(x, y + BASS_Y, w);
         if (first) {
@@ -247,9 +253,12 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
       console.error(e);
       setError('악보를 그리는 중 문제가 생겼어요.');
     }
-  }, [score, width, keySig, chords]);
+  }, [score, width, keySig, chords, lineH]);
 
   const activeBar = activeBeat !== undefined && activeBeat >= 0 ? Math.floor(activeBeat / 4) : -1;
+  // the chord (and so the words) being played right now
+  let sungChord = -1;
+  if (activeBeat !== undefined && activeBeat >= 0) score.arr.starts.forEach((st, i) => st <= activeBeat + 1e-6 && (sungChord = i));
   const box = boxes[activeBar];
 
   // 따라치기: colour the noteheads themselves (red = play now, orange = coming up, green = played)
@@ -301,6 +310,19 @@ export function SheetMusic({ chords, rhythm, keySig, activeBeat, voicing = 'smoo
           {prettyChord(m.symbol)}
         </button>
       ))}
+      {hasLyrics &&
+        marks.map((m, i) => {
+          const words = chords[m.chord]?.lyric?.trim();
+          if (!words) return null;
+          // room up to the next chord on the same line, else to the end of the line
+          const next = marks[i + 1];
+          const room = (next && next.y === m.y ? next.x : width - 8) - m.x;
+          return (
+            <div key={`l${i}`} className={`sheet-lyric${m.chord === sungChord ? ' on' : ''}`} style={{ left: m.x - 2, top: m.y - 2 + LYRIC_Y, maxWidth: Math.max(36, room - 4) }}>
+              {words}
+            </div>
+          );
+        })}
       {hits.map((h, i) => {
         return (
         <span

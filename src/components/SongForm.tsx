@@ -10,7 +10,7 @@ import { estimateKeyFromChords } from '../theory/key';
 import { keyLabel, MAJOR_KEYS, MINOR_KEYS } from '../theory/keys';
 import { prettyChord, splitSlash } from '../theory/notes';
 import { parseBars } from '../theory/roman';
-import { linesToBarText, parseChordSheet, respaceChords, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
+import { linesToBarText, parseChordSheet, respaceChords, sectionLyrics, toBarText, transposeBarText, uniformChordBeats } from '../theory/sheet';
 import { useStore } from '../store';
 import { LookupError, LookupMode, lookupMode, LookupResult, lookupSongMeta } from '../ai/songLookup';
 import { keyAdvice, KeyAdvice, keyShift } from '../ai/songMeta';
@@ -54,6 +54,8 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const [subtype, setSubtype] = useState<string | undefined>(initial?.subtype);
   const [rhythm, setRhythm] = useState(initial?.rhythm ?? 'pop8');
   const [text, setText] = useState(initial ? initial.sections.map((s) => `${s.name}: ${s.chords}`).join('\n') : '');
+  /** words per chord, per section (index-aligned with the sections in `text`) */
+  const [lyrics, setLyrics] = useState<string[][]>(() => (initial ? initial.sections.map((s) => s.lyrics ?? []) : []));
   const [error, setError] = useState<string | null>(null);
   const [filled, setFilled] = useState<string | null>(null);
 
@@ -70,8 +72,9 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const [progress, setProgress] = useState<number | null>(null);
   const [audioNote, setAudioNote] = useState<string | null>(null);
 
-  const fill = (lines: string, detectedKey: string | undefined, how: string) => {
+  const fill = (lines: string, detectedKey: string | undefined, how: string, words: string[][] = []) => {
     setText(lines);
+    setLyrics(words);
     if (detectedKey) setKey(detectedKey);
     setFilled(how);
     setError(null);
@@ -80,7 +83,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const applySheet = () => {
     if (!parsed || !parsed.sections.length) return;
     const bars = (s: (typeof parsed.sections)[number]) => (perBar === 'line' ? linesToBarText(s.lines) : toBarText(s.chords, perBar));
-    fill(parsed.sections.map((s) => `${s.name}: ${bars(s)}`).join('\n'), parsed.key, '붙여넣은 코드 악보');
+    fill(parsed.sections.map((s) => `${s.name}: ${bars(s)}`).join('\n'), parsed.key, '붙여넣은 코드 악보', parsed.sections.map(sectionLyrics));
   };
 
   const [ytStatus, setYtStatus] = useState<YoutubeStatus | null>(null);
@@ -134,6 +137,7 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
   const bad = [...new Set(allChords.filter((sym) => Chord.get(splitSlash(sym)[0]).empty))];
   const guessKey = allChords.length ? estimateKeyFromChords(allChords, Infinity, 1)[0]?.key : undefined;
   const subtypes = GENRES.find((g) => g.id === genre)?.subtypes;
+  const hasLyrics = lyrics.some((l) => l.some((w) => w.trim()));
   const sameLength = sections.length ? sections.map((s) => uniformChordBeats(s.chords)) : [];
   const chordBeats = sameLength.length && sameLength.every((b) => b !== undefined && b === sameLength[0]) ? sameLength[0] : undefined;
 
@@ -205,7 +209,10 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
       bpm,
       rhythm,
       difficulty: 1,
-      sections,
+      sections: sections.map((s, i) => {
+        const words = (lyrics[i] ?? []).slice(0, parseBars(s.chords).length);
+        return words.some((w) => w.trim()) ? { ...s, lyrics: words } : s;
+      }),
       about: initial?.about ?? (filled ? `${filled}로 추가한 노래` : '내가 추가한 노래'),
       tips: initial?.tips ?? [],
       custom: true,
@@ -228,19 +235,18 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         </label>
       </div>
 
-      {!initial && (
-        <div className="seg big">
-          <button className={method === 'paste' ? 'on' : ''} onClick={() => setMethod('paste')}>
-            📋 코드 악보 붙여넣기
-          </button>
-          <button className={method === 'audio' ? 'on' : ''} onClick={() => setMethod('audio')}>
-            🎧 음원 파일로 자동 분석
-          </button>
-          <button className={method === 'manual' ? 'on' : ''} onClick={() => setMethod('manual')}>
-            ✏️ 직접 입력
-          </button>
-        </div>
-      )}
+      <div className="seg big">
+        <button className={method === 'paste' ? 'on' : ''} onClick={() => setMethod('paste')}>
+          📋 코드 악보 붙여넣기{initial ? ' (다시)' : ''}
+        </button>
+        <button className={method === 'audio' ? 'on' : ''} onClick={() => setMethod('audio')}>
+          🎧 음원 파일로 자동 분석
+        </button>
+        <button className={method === 'manual' ? 'on' : ''} onClick={() => setMethod('manual')}>
+          ✏️ {initial ? '지금 코드 고치기' : '직접 입력'}
+        </button>
+      </div>
+      {initial && method === 'paste' && <p className="muted small">가사가 든 코드 악보를 다시 붙여넣고 [이 코드로 채우기]를 누르면 아래 코드와 가사가 새로 바뀌어요.</p>}
 
       {method === 'paste' && (
         <div className="import-box">
@@ -473,6 +479,35 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         </span>
         <textarea id="song-chords" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'벌스: C G | Am F\n후렴: F G | Em Am'} />
       </label>
+      {hasLyrics && (
+        <details className="lyric-preview" id="lyric-preview">
+          <summary className="small">
+            📝 가사가 코드에 붙어 있어요 — 악보 아래에 같이 보여요 <span className="muted">(눌러서 확인)</span>{' '}
+            <button
+              className="link-btn small"
+              onClick={(e) => {
+                e.preventDefault();
+                setLyrics([]);
+              }}
+            >
+              가사 빼기
+            </button>
+          </summary>
+          {sections.map((s, si) => (
+            <div key={si} className="parse-section">
+              <b>{s.name}</b>
+              <div className="lyric-chips small">
+                {parseBars(s.chords).map((c, ci) => (
+                  <span key={ci}>
+                    <b>{prettyChord(c.symbol)}</b> {lyrics[si]?.[ci] ?? ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p className="muted small">코드를 직접 고쳐서 개수가 달라지면 가사가 한 칸씩 밀릴 수 있어요.</p>
+        </details>
+      )}
       {allChords.length > 0 && (
         <div className="row gap wrap center-y chord-length">
           <span className="small muted">코드 하나의 길이를 한 번에:</span>
@@ -489,8 +524,10 @@ export function SongForm({ onClose, initial }: { onClose: () => void; initial?: 
         sections={sections}
         bpm={bpm}
         songKey={key}
-        onApply={(t, b, k) => {
+        lyrics={lyrics}
+        onApply={(t, b, k, words) => {
           setText(t);
+          setLyrics(words);
           setBpm(Math.min(220, Math.max(40, b)));
           setKey(k);
         }}

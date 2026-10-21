@@ -9,6 +9,8 @@ const NUMERAL_RE = /^([b#]*)(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)(.*)$/;
 export interface ChordEvent {
   symbol: string;
   beats: number;
+  /** words sung on this chord (songs added from a chord sheet with lyrics) */
+  lyric?: string;
 }
 
 function degreeIndex(roman: string): number {

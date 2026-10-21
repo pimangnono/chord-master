@@ -4,6 +4,8 @@ export interface SongSection {
   name: string;
   /** chord symbols, bars separated by "|" */
   chords: string;
+  /** words sung on each chord of `chords`, in order (user-added songs only) */
+  lyrics?: string[];
 }
 
 export interface Song {
