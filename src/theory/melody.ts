@@ -376,3 +376,21 @@ export function songToMidi(song: Song): Uint8Array {
   const header = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 3, (PPQ >> 8) & 255, PPQ & 255];
   return new Uint8Array([...header, ...meta, ...track(chordEvents), ...track(melodyEvents)]);
 }
+
+/** A safe four-bar progression for "추천 4마디": I–vi–IV–V, or i–bVI–bIII–bVII in minor. */
+export function starterChords(key: string): string[] {
+  const nums = parseKey(key).minor ? ['i', 'bVI', 'bIII', 'bVII'] : ['I', 'vi', 'IV', 'V'];
+  return nums.map((n) => romanToChord(n, key));
+}
+
+/** How a move between two chords feels, for the role strip between bars. */
+export function flowNote(a: string, b: string, key: string): { label: string; smooth: boolean } {
+  const fa = chordFn(a, key);
+  const fb = chordFn(b, key);
+  if (a === b) return { label: '머무름', smooth: true };
+  if (fa === 'D' && fb === 'T') return { label: '해결', smooth: true };
+  if (fa === 'D' && fb === 'S') return { label: '거꾸로', smooth: false };
+  if (fb === 'D') return { label: '긴장 쌓기', smooth: true };
+  if (fb === 'S') return { label: '펼치기', smooth: true };
+  return { label: '쉬어가기', smooth: true };
+}

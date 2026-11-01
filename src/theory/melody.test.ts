@@ -96,3 +96,18 @@ describe('melody maker', () => {
     expect(DEFAULT_SONG.melody).toEqual([]);
   });
 });
+
+import { flowNote, starterChords } from './melody';
+
+describe('chord helpers', () => {
+  it('offers a starter progression in major and minor', () => {
+    expect(starterChords('C')).toEqual(['C', 'Am', 'F', 'G']);
+    expect(starterChords('Am')).toEqual(['Am', 'F', 'C', 'G']);
+  });
+
+  it('labels chord moves', () => {
+    expect(flowNote('G7', 'C', 'C')).toEqual({ label: '해결', smooth: true });
+    expect(flowNote('G', 'F', 'C').smooth).toBe(false);
+    expect(flowNote('C', 'F', 'C').label).toBe('펼치기');
+  });
+});

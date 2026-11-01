@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { playNotes, playSequence, player } from '../audio/engine';
 import { startPlayback, stopPlayback, usePlayback } from '../audio/playback';
@@ -17,6 +17,7 @@ import {
   encodeSong,
   endingChords,
   FN_LABEL,
+  flowNote,
   HIGH,
   LOW,
   MAX_BARS,
@@ -31,6 +32,7 @@ import {
   scalePcs,
   Song,
   songToMidi,
+  starterChords,
   suggestChords,
   suggestNotes,
   totalBeats,
@@ -153,6 +155,7 @@ export function MelodyPage() {
   const [explore, setExplore] = useState<number | null>(null);
   const [toast, setToast] = useState('');
   const pb = usePlayback();
+  const helpRef = useRef<HTMLDialogElement>(null);
 
   const shared = useMemo(() => {
     const s = params.get('s');
@@ -265,11 +268,34 @@ export function MelodyPage() {
   const sel = selNote !== null ? song.melody[selNote] : null;
 
   return (
+    <div className="mel-theme">
     <div className="page mel-page">
-      <header className="page-head">
-        <h1>🎶 멜로디 만들기</h1>
-        <p className="muted">코드를 먼저 깔고, 그 위에 음을 하나씩 골라 올려 보세요. 악보를 몰라도 귀로 듣고 고르면 됩니다.</p>
-      </header>
+      <div className="mel-topbar">
+        <span className="mel-logo">
+          <i>♬</i> 멜로디 만들기 <small>v1</small>
+        </span>
+        <span className="mel-top-note">● 무료 · 로그인 없이 바로</span>
+        <button className="btn small ghost" onClick={() => helpRef.current?.showModal()}>
+          ? 처음이라면
+        </button>
+      </div>
+
+      <section className="mel-hero">
+        <div>
+          <p className="mel-eyebrow">CHORDS FIRST, THEN A TUNE.</p>
+          <h1>
+            코드 위에 한 음씩,
+            <br />
+            나만의 멜로디<span className="mel-accent">.</span>
+          </h1>
+          <p className="muted">반주를 먼저 정해 두면 어떤 음이 어울릴지 귀로 들려요. 마음에 드는 음만 골라 쌓으면 한 곡이 됩니다.</p>
+        </div>
+        <div className="mel-hero-art" aria-hidden="true">
+          {[3, 6, 4, 8, 5, 7, 2].map((h, i) => (
+            <span key={i} style={{ height: `${h * 11}%`, animationDelay: `${i * 0.15}s` }} />
+          ))}
+        </div>
+      </section>
 
       {shared && (
         <section className="card mel-shared" aria-label="공유받은 곡">
@@ -305,7 +331,7 @@ export function MelodyPage() {
 
       <section className="card">
         <div className="card-head">
-          <h3>어떤 느낌으로 시작할까요?</h3>
+          <h3>오늘은 어떤 기분의 곡을 써 볼까요?</h3>
           <span className="muted small">고르면 조성·코드·빠르기가 한 번에 정해져요</span>
         </div>
         <div className="mel-moods">
@@ -335,7 +361,7 @@ export function MelodyPage() {
       <section className="card">
         <div className="card-head">
           <h3>
-            <span className="mel-step">1</span> 코드 깔기
+            <span className="mel-step">01</span> 먼저 코드를 깔아요
           </h3>
           <span className="muted small">
             {keyLabel(song.key)} · {song.chords.length}마디 · 한 마디에 코드 하나(4박)
@@ -358,6 +384,22 @@ export function MelodyPage() {
             </button>
           ))}
         </div>
+
+        <div className="mel-flow" aria-label="코드의 역할과 흐름">
+          {song.chords.map((c, i) => {
+            const nxt = song.chords[i + 1];
+            const f = nxt ? flowNote(c, nxt, song.key) : null;
+            return (
+              <span key={i} className="mel-flow-item">
+                <b className={`fn-${chordFn(c, song.key)}`}>{FN_LABEL[chordFn(c, song.key)]}</b>
+                {f && <em className={f.smooth ? '' : 'rough'}>→ {f.label}</em>}
+              </span>
+            );
+          })}
+        </div>
+        {song.chords.some((c, i) => i < song.chords.length - 1 && !flowNote(c, song.chords[i + 1], song.key).smooth) && (
+          <p className="muted small">💡 ‘거꾸로’는 긴장 다음에 펼침이 오는 곳이에요. 틀린 건 아니지만, 긴장 뒤엔 안정이 오면 더 개운하게 들려요.</p>
+        )}
 
         <div className="mel-chord-help">
           <div>
@@ -438,6 +480,17 @@ export function MelodyPage() {
           >
             ↶ 되돌리기
           </button>
+          <button
+            className="btn ghost"
+            onClick={() => {
+              const chords = starterChords(song.key);
+              setChords(chords);
+              setSelBar(0);
+              playSequence(chords.map(voiced), (60 / song.bpm) * 2, 1.1);
+            }}
+          >
+            ✦ 추천 4마디
+          </button>
           {!writing && (
             <button className="btn big mel-go" onClick={() => setWriting(true)}>
               이 코드로 멜로디 쓰기 →
@@ -452,7 +505,7 @@ export function MelodyPage() {
           <section className="card mel-compose">
             <div className="card-head">
               <h3>
-                <span className="mel-step">2</span> 멜로디 올리기
+                <span className="mel-step">02</span> 코드 위에 멜로디를 얹어요
               </h3>
               <span className="muted small">
                 {song.melody.filter((n) => n.midi !== null).length}음 · {pos}/{end}박
@@ -694,11 +747,46 @@ export function MelodyPage() {
         )}
       </section>
 
+      <footer className="mel-footer">
+        <b>멜로디 만들기</b>
+        <span>흥얼거리던 한 소절을 진짜 곡으로.</span>
+        <span>◉ 작업은 이 브라우저에 자동 저장</span>
+      </footer>
+
+      <dialog ref={helpRef} className="mel-dialog" onClick={(e) => e.target === helpRef.current && helpRef.current?.close()}>
+        <button className="mel-dialog-x" onClick={() => helpRef.current?.close()} aria-label="닫기">
+          ×
+        </button>
+        <h2>이렇게 만들어요</h2>
+        <ol>
+          <li>
+            <b>기분 고르기</b> — 분위기 카드를 누르면 조성·코드·빠르기가 정해져요.
+          </li>
+          <li>
+            <b>코드 다듬기</b> — 마디를 누르고 추천 코드나 목록에서 바꿔요. ▶로 앞뒤와 이어 들어 보세요.
+          </li>
+          <li>
+            <b>음 쌓기</b> — 후보의 ▶로 코드와 함께 들어 보고 ‘넣기’. 건반을 눌러도 바로 들어가요.
+          </li>
+          <li>
+            <b>다듬기</b> — 넣은 음을 누르면 반음 올리기·내리기, 길이 바꾸기, 지우기가 돼요.
+          </li>
+          <li>
+            <b>들려주기</b> — 공유 링크를 복사하거나 MIDI 파일로 저장해 작곡 프로그램에서 이어 작업하세요.
+          </li>
+        </ol>
+        <p className="muted small">분홍 = 지금 코드의 음 · 청록 = 음계 음 · 보라 = 선택한 음</p>
+        <button className="btn" onClick={() => helpRef.current?.close()}>
+          시작하기
+        </button>
+      </dialog>
+
       {toast && (
         <div className="mel-toast" role="status">
           {toast}
         </div>
       )}
+    </div>
     </div>
   );
 }
