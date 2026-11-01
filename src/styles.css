@@ -2820,3 +2820,447 @@ textarea {
   flex-wrap: wrap;
   gap: 4px 12px;
 }
+
+/* ───────── 멜로디 만들기 ───────── */
+.mel-step {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.mel-shared {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-color: var(--brand2);
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.12), var(--panel));
+}
+
+.mel-shared p {
+  margin: 2px 0 0;
+}
+
+.mel-moods {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.mel-mood {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg2);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.mel-mood:hover {
+  border-color: var(--brand);
+}
+
+.mel-mood:active {
+  transform: scale(0.98);
+}
+
+.mel-mood-emoji {
+  font-size: 1.5rem;
+}
+
+.mel-mood small {
+  color: var(--muted);
+}
+
+.mel-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+
+.mel-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  border-top: 4px solid var(--fn, var(--line));
+  background: var(--bg2);
+  cursor: pointer;
+}
+
+.mel-bar b {
+  font-size: 1.25rem;
+}
+
+.mel-bar small,
+.mel-bar em {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-style: normal;
+}
+
+.mel-bar.sel {
+  border-color: var(--brand);
+  border-top-color: var(--fn, var(--brand));
+  background: rgba(124, 92, 255, 0.14);
+}
+
+.mel-bar.now {
+  box-shadow: 0 0 0 3px rgba(47, 211, 138, 0.55);
+}
+
+.fn-T {
+  --fn: var(--T);
+}
+
+.fn-S {
+  --fn: var(--S);
+}
+
+.fn-D {
+  --fn: var(--D);
+}
+
+.mel-chord-help {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+}
+
+.mel-chord-help h4 {
+  margin-bottom: 2px;
+}
+
+.mel-chord-ideas,
+.mel-ideas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.mel-chord-idea,
+.mel-idea {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--fn, var(--line));
+}
+
+.mel-chord-idea div,
+.mel-idea div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mel-chord-idea small,
+.mel-idea small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.mel-idea.chord {
+  border-left-color: #ff7aa8;
+}
+
+.mel-idea.scale {
+  border-left-color: #6fe0cd;
+}
+
+.mel-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mel-ending {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg2);
+}
+
+.mel-ending > span {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.mel-ending .btn.on {
+  border-color: var(--brand);
+  background: rgba(124, 92, 255, 0.22);
+}
+
+.mel-toolbar {
+  margin-top: 14px;
+}
+
+.mel-go {
+  margin-left: auto;
+}
+
+.mel-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.mel-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mel-where {
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(124, 92, 255, 0.12);
+  font-weight: 600;
+}
+
+.mel-roll {
+  position: relative;
+  height: 200px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.mel-roll-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+  background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), rgba(255, 255, 255, 0.04) calc(25% - 1px) 25%);
+}
+
+.mel-roll-bar span {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.mel-roll-note {
+  position: absolute;
+  margin-left: 1px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  cursor: pointer;
+  background: #9c82ff;
+}
+
+.mel-roll-note.chord {
+  background: #ff7aa8;
+}
+
+.mel-roll-note.scale {
+  background: #6fe0cd;
+}
+
+.mel-roll-note.sel {
+  outline: 3px solid #fff;
+  outline-offset: 1px;
+}
+
+.mel-roll-rest {
+  position: absolute;
+  bottom: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mel-roll-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--good);
+  transition: left 0.12s linear;
+}
+
+.mel-seq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+  min-height: 46px;
+  align-items: center;
+}
+
+.mel-seq-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  cursor: pointer;
+}
+
+.mel-seq-note small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.mel-seq-note.rest {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.mel-seq-note.sel {
+  border-color: var(--brand);
+  background: rgba(124, 92, 255, 0.22);
+}
+
+.mel-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--brand);
+  background: rgba(124, 92, 255, 0.1);
+}
+
+.mel-edit select {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+
+.mel-transport {
+  align-items: flex-end;
+}
+
+.mel-tempo input {
+  width: 140px;
+}
+
+.mel-piano {
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+.mel-piano .piano {
+  min-width: 460px;
+}
+
+.mel-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.mel-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.mel-legend i.chord {
+  background: #ff7aa8;
+}
+
+.mel-legend i.scale {
+  background: #6fe0cd;
+}
+
+.mel-legend i.sel {
+  background: #9c82ff;
+}
+
+.mel-tip {
+  margin: 10px 0;
+}
+
+.mel-tip summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.mel-share {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.16), var(--panel));
+}
+
+.mel-share-url {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  font-size: 0.85rem;
+}
+
+.mel-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 99px;
+  background: var(--panel2);
+  border: 1px solid var(--brand);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  z-index: 50;
+}
+
+@media (max-width: 1100px) {
+  .mel-work,
+  .mel-chord-help {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .mel-go {
+    margin-left: 0;
+    width: 100%;
+  }
+}

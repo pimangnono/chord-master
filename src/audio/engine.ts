@@ -190,6 +190,8 @@ export interface PlayOptions {
   muteLH?: boolean;
   muteRH?: boolean;
   voicing?: VoicingMode;
+  /** a lead line played on top of the accompaniment (beats from the start) */
+  melody?: { t: number; d: number; midi: number }[];
   onChord?: (index: number) => void;
   onBeat?: (beat: number) => void;
   onEnd?: () => void;
@@ -225,6 +227,17 @@ class Player {
       piano.triggerAttackRelease(freqs(e.notes), dur, time, vel);
     }, notes);
     this.parts.push(notePart);
+
+    if (opts.melody?.length) {
+      const leadPart = new Tone.Part(
+        (time, { m }: { m: { d: number; midi: number } }) => {
+          const dur = Tone.Ticks(Math.round(m.d * ppq)).toSeconds() * 0.92;
+          piano?.triggerAttackRelease(Tone.Frequency(m.midi, 'midi').toFrequency(), dur, time, 0.85);
+        },
+        opts.melody.map((m) => ({ time: ticks(m.t), m })),
+      );
+      this.parts.push(leadPart);
+    }
 
     if (opts.drums && drumKit) {
       const kit = drumKit;
